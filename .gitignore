@@ -1,0 +1,35 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+build/
+dist/
+
+# Databases
+*.db
+*.db-journal
+*.sqlite
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# IDE Files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Gemini/AI
+.gemini/
+brain/
+artifacts/
+scratch/
+
+# Excel Temp Files
+~$*.xlsx
