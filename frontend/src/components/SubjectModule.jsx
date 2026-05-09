@@ -2,7 +2,7 @@ import React from 'react';
 import { Edit2, Trash2 } from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE = 'http://127.0.0.1:3001/api';
+const API_BASE = `http://${window.location.hostname}:3001/api`;
 
 export default function SubjectModule({ subjects, onEdit, onRefresh }) {
   const handleImport = async () => {

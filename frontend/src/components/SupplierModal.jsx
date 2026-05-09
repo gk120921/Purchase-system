@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { X } from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE = 'http://127.0.0.1:3001/api';
+const API_BASE = `http://${window.location.hostname}:3001/api`;
 
 export default function SupplierModal({ editData, suppliers, onClose, onSuccess }) {
   const [formData, setFormData] = useState({

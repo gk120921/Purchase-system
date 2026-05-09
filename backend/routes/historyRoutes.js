@@ -27,19 +27,21 @@ router.get('/', async (req, res) => {
 
         // 整合 PO 歷史
         const poHistory = await db.allAsync(`
-            SELECT 'PO' as type, id, po_number as number, 'N/A' as requester, 'N/A' as department, 
-                   total_amount, status, created_at, remarks,
-                   currency, exchange_rate
-            FROM purchase_orders
-            WHERE status IN ('approved', 'closed', 'rejected')
-            ${search ? 'AND (po_number LIKE ?)' : ''}
-        `, search ? [`%${search}%`] : []);
+            SELECT 'PO' as type, po.id, po.po_number as number, pr.requester, pr.department, 
+                   po.total_amount, po.status, po.created_at, po.remarks,
+                   po.currency, po.exchange_rate
+            FROM purchase_orders po
+            LEFT JOIN purchase_requests pr ON po.pr_id = pr.id
+            WHERE po.status IN ('approved', 'closed', 'rejected')
+            ${search ? 'AND (po.po_number LIKE ? OR pr.requester LIKE ? OR pr.department LIKE ?)' : ''}
+        `, search ? [`%${search}%`, `%${search}%`, `%${search}%`] : []);
 
         // 整合兩者並按日期排序
         const combined = [...prHistory, ...poHistory].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
         
         res.json(combined);
     } catch (err) {
+        console.error('History API Error:', err);
         res.status(500).json({ error: err.message });
     }
 });

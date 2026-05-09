@@ -6,7 +6,7 @@ import {
   BarChart, Bar
 } from 'recharts';
 
-const API_BASE = 'http://127.0.0.1:3001/api';
+const API_BASE = `http://${window.location.hostname}:3001/api`;
 const COLORS = ['#1e3a8a', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4'];
 
 export default function Dashboard({ pos, prs }) {

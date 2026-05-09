@@ -1,35 +1,17 @@
 # Dependencies
 node_modules/
-.pnp
-.pnp.js
-
-# Testing
-coverage/
-
-# Production
-build/
 dist/
+.env
 
-# Databases
+# Database
 *.db
 *.db-journal
-*.sqlite
 
-# OS Files
+# Logs
+*.log
+backend_log.txt
+frontend_log.txt
+
+# OS files
 .DS_Store
 Thumbs.db
-
-# IDE Files
-.vscode/
-.idea/
-*.swp
-*.swo
-
-# Gemini/AI
-.gemini/
-brain/
-artifacts/
-scratch/
-
-# Excel Temp Files
-~$*.xlsx

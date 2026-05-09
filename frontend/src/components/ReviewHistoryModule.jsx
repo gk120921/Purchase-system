@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Search, FileText, RotateCcw, Trash2, Eye, Calendar, User, Building2, ChevronRight } from 'lucide-react';
 
-const API_BASE = 'http://127.0.0.1:3001/api';
+const API_BASE = `http://${window.location.hostname}:3001/api`;
 
 export default function ReviewHistoryModule({ onPreview }) {
     const [history, setHistory] = useState([]);

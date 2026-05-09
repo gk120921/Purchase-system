@@ -23,7 +23,7 @@ import ErrorBoundary from './components/ErrorBoundary';
 import DeptModule from './components/DeptModule';
 import ReviewHistoryModule from './components/ReviewHistoryModule';
 
-const API_BASE = 'http://127.0.0.1:3001/api';
+const API_BASE = `http://${window.location.hostname}:3001/api`;
 
 function App() {
   const [user, setUser] = useState(null);
@@ -151,6 +151,21 @@ function App() {
                   <button className="btn btn-primary" style={{ background: '#3b82f6' }} onClick={() => { setEditingPr(null); setPrModalMode('bom'); }}>+ 新增物料 PR</button>
                 </>
               )}
+              {activeTab === 'materials' && (
+                <button className="btn btn-primary" onClick={() => {
+                  const num = prompt('Enter Material Number / 輸入物料編號:');
+                  const unit = prompt('Enter Unit (e.g. PCS, KG) / 輸入單位:');
+                  if (num && unit) {
+                    axios.post(`${API_BASE}/materials`, { material_number: num, name: num, unit }).then(() => fetchData());
+                  }
+                }}>+ 新增物料 Material</button>
+              )}
+              {activeTab === 'departments' && (
+                <button className="btn btn-primary" onClick={() => {
+                  const event = new CustomEvent('toggle-add-dept');
+                  window.dispatchEvent(event);
+                }}>+ 新增部門 Unit</button>
+              )}
               {activeTab === 'users' && (
                 <button className="btn btn-primary" onClick={() => { setEditingUser(null); setShowUserModal(true); }}>+ 新增人員 User</button>
               )}
@@ -185,6 +200,20 @@ function App() {
           {showUserModal && <UserModal editData={editingUser} onClose={() => setShowUserModal(false)} onSuccess={() => { setShowUserModal(false); fetchData(); }} departments={departments} allUsers={allUsers} />}
           {showSubjectModal && <SubjectModal editData={editingSubject} onClose={() => setShowSubjectModal(false)} onSuccess={() => { setShowSubjectModal(false); fetchData(); }} />}
         </main>
+
+        {/* 建議清單 Datalists */}
+        <datalist id="material-datalist">
+          {materials.map(m => (
+            <option key={m.id} value={m.material_number}>
+              {m.name || ''}
+            </option>
+          ))}
+        </datalist>
+        <datalist id="supplier-datalist">
+          {suppliers.map(s => (
+            <option key={s.id} value={s.supplier_code ? `${s.supplier_code} - ${s.name}` : s.name} />
+          ))}
+        </datalist>
       </div>
     </ErrorBoundary>
   );

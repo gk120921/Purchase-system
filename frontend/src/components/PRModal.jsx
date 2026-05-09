@@ -5,7 +5,7 @@ import PRHeader from './PRModal/PRHeader';
 import PRTable from './PRModal/PRTable';
 import PRFooter from './PRModal/PRFooter';
 
-const API_BASE = 'http://127.0.0.1:3001/api';
+const API_BASE = `http://${window.location.hostname}:3001/api`;
 
 export default function PRModal({ mode, user, editData, isPreview, onClose, suppliers, subjects, materials, onSuccess }) {
   // ... existing date logic ...

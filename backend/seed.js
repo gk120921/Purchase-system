@@ -11,8 +11,8 @@ async function importSuppliersFromExcel(db) {
     }
 
     console.log('Recreating suppliers table...');
-    await db.run('DROP TABLE IF EXISTS suppliers');
-    await db.run(`
+    await db.runAsync('DROP TABLE IF EXISTS suppliers');
+    await db.runAsync(`
         CREATE TABLE suppliers (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             supplier_code TEXT UNIQUE,
@@ -34,7 +34,7 @@ async function importSuppliersFromExcel(db) {
     const data = xlsx.utils.sheet_to_json(sheet);
 
     console.log(`Importing ${data.length} suppliers from Excel...`);
-    const stmt = await db.prepare(`
+    const stmt = await db.prepareAsync(`
         INSERT INTO suppliers (supplier_code, name, category, contact, phone, email, address)
         VALUES (?, ?, ?, ?, ?, ?, ?)
     `);
@@ -49,12 +49,12 @@ async function importSuppliersFromExcel(db) {
         const address = row['聯絡地址\r\nContact address'] || '';
 
         try {
-            await stmt.run(code, name, category, contact, phone, email, address);
+            await stmt.runAsync(code, name, category, contact, phone, email, address);
         } catch (err) {
             // Ignore duplicates
         }
     }
-    await stmt.finalize();
+    await stmt.finalizeAsync();
     console.log('Suppliers imported successfully.');
 }
 
@@ -66,12 +66,14 @@ async function importMaterialsFromExcel(db) {
     }
 
     console.log('Recreating materials table...');
-    await db.run('DROP TABLE IF EXISTS materials');
-    await db.run(`
+    await db.runAsync('DROP TABLE IF EXISTS materials');
+    await db.runAsync(`
         CREATE TABLE materials (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             material_number TEXT UNIQUE NOT NULL,
-            unit TEXT NOT NULL
+            name TEXT,
+            unit TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
 
@@ -80,9 +82,9 @@ async function importMaterialsFromExcel(db) {
     const data = xlsx.utils.sheet_to_json(sheet);
 
     console.log(`Importing materials from Excel...`);
-    const stmt = await db.prepare(`
-        INSERT OR IGNORE INTO materials (material_number, unit)
-        VALUES (?, ?)
+    const stmt = await db.prepareAsync(`
+        INSERT OR IGNORE INTO materials (material_number, name, unit)
+        VALUES (?, ?, ?)
     `);
 
     for (const row of data) {
@@ -90,10 +92,10 @@ async function importMaterialsFromExcel(db) {
         const unit = row['單位'];
 
         if (materialNumber && unit) {
-            await stmt.run(materialNumber, unit);
+            await stmt.runAsync(materialNumber, materialNumber, unit);
         }
     }
-    await stmt.finalize();
+    await stmt.finalizeAsync();
     console.log('Materials imported successfully.');
 }
 
@@ -102,8 +104,8 @@ async function seed() {
 
     // 0. Seed Users
     console.log('Recreating users table...');
-    await db.run('DROP TABLE IF EXISTS users');
-    await db.run(`
+    await db.runAsync('DROP TABLE IF EXISTS users');
+    await db.runAsync(`
         CREATE TABLE users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             username TEXT UNIQUE NOT NULL,
@@ -113,6 +115,10 @@ async function seed() {
             dept_code TEXT,
             dept_name TEXT,
             allowed_modules TEXT,
+            dept_id INTEGER, 
+            proxy_user_id INTEGER, 
+            proxy_end DATETIME, 
+            proxy_start DATETIME,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP
         )
     `);
@@ -120,13 +126,13 @@ async function seed() {
     const users = [
         ['buyer', '1234', '採購小張', 'purchaser', 'D001', '採購部', JSON.stringify(['dashboard', 'pr', 'subjects', 'suppliers'])],
         ['boss', '1234', '陳主管', 'supervisor', 'M001', '管理層', JSON.stringify(['dashboard', 'approvals', 'po', 'subjects', 'suppliers', 'export'])],
-        ['admin', 'admin123', '管理員', 'admin', 'S001', '系統課', JSON.stringify(['dashboard', 'pr', 'approvals', 'po', 'subjects', 'suppliers', 'users', 'export'])]
+        ['admin', 'admin123', '管理員', 'admin', 'S001', '系統課', JSON.stringify(['dashboard', 'pr', 'approvals', 'po', 'history', 'subjects', 'materials', 'suppliers', 'departments', 'users', 'settings', 'export'])]
     ];
-    const userStmt = await db.prepare('INSERT INTO users (username, password, name, role, dept_code, dept_name, allowed_modules) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    const userStmt = await db.prepareAsync('INSERT INTO users (username, password, name, role, dept_code, dept_name, allowed_modules) VALUES (?, ?, ?, ?, ?, ?, ?)');
     for (const u of users) {
-        await userStmt.run(...u);
+        await userStmt.runAsync(...u);
     }
-    await userStmt.finalize();
+    await userStmt.finalizeAsync();
     console.log('Default users seeded.');
 
     // 1. Import Accounting Subjects
@@ -136,27 +142,28 @@ async function seed() {
         const sheet = workbook.Sheets['Subject Code'];
         const data = xlsx.utils.sheet_to_json(sheet);
 
-        await db.run('DROP TABLE IF EXISTS accounting_subjects');
-        await db.run(`
+        await db.runAsync('DROP TABLE IF EXISTS accounting_subjects');
+        await db.runAsync(`
             CREATE TABLE accounting_subjects (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 category TEXT,
                 code TEXT UNIQUE NOT NULL,
                 name TEXT NOT NULL,
                 english_name TEXT,
-                description TEXT
+                description TEXT,
+                created_at DATETIME DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
-        const stmt = await db.prepare('INSERT OR IGNORE INTO accounting_subjects (category, code, name, english_name, description) VALUES (?, ?, ?, ?, ?)');
+        const stmt = await db.prepareAsync('INSERT OR IGNORE INTO accounting_subjects (category, code, name, english_name, description) VALUES (?, ?, ?, ?, ?)');
         for (const row of data) {
             const code = row['科目代碼 (Code)'];
             const name = row['名稱 (Name - Traditional Chinese)'];
             if (code && name) {
-                await stmt.run(row['分類 (Category)'], code.toString(), name, row['英文名稱 (English Name)'], row['內容說明 (Description)']);
+                await stmt.runAsync(row['分類 (Category)'], code.toString(), name, row['英文名稱 (English Name)'], row['內容說明 (Description)']);
             }
         }
-        await stmt.finalize();
+        await stmt.finalizeAsync();
         console.log('Accounting subjects imported.');
     } catch (err) {
         console.error('Accounting subjects import failed:', err.message);
@@ -168,7 +175,6 @@ async function seed() {
     // 3. Import Materials
     await importMaterialsFromExcel(db);
 
-    await db.close();
     console.log('Seeding complete.');
 }
 

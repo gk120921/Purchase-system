@@ -2,11 +2,17 @@ import React, { useState } from 'react';
 import { Plus, Trash2, GitMerge } from 'lucide-react';
 import axios from 'axios';
 
-const API_BASE = 'http://127.0.0.1:3001/api';
+const API_BASE = `http://${window.location.hostname}:3001/api`;
 
 export default function DeptModule({ departments, onRefresh }) {
   const [showAddForm, setShowAddForm] = useState(false);
-  const [newDept, setNewDept] = useState({ dept_code: '', name: '', parent_id: '' });
+  const [newDept, setNewDept] = useState({ dept_code: '', name: '', parent_id: '', manager: '' });
+
+  React.useEffect(() => {
+    const handleToggle = () => setShowAddForm(prev => !prev);
+    window.addEventListener('toggle-add-dept', handleToggle);
+    return () => window.removeEventListener('toggle-add-dept', handleToggle);
+  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -40,7 +46,7 @@ export default function DeptModule({ departments, onRefresh }) {
 
       {showAddForm && (
         <form onSubmit={handleSubmit} style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', marginBottom: '2rem', border: '1px solid #e2e8f0' }}>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '1rem' }}>
             <div className="form-group">
               <label>部門代碼 Code</label>
               <input className="form-control" placeholder="例如: T130" value={newDept.dept_code} onChange={e => setNewDept({...newDept, dept_code: e.target.value})} required />
@@ -48,6 +54,10 @@ export default function DeptModule({ departments, onRefresh }) {
             <div className="form-group">
               <label>部門名稱 Name</label>
               <input className="form-control" placeholder="例如: 採購課" value={newDept.name} onChange={e => setNewDept({...newDept, name: e.target.value})} required />
+            </div>
+            <div className="form-group">
+              <label>負責人 Manager</label>
+              <input className="form-control" placeholder="例如: Joseph" value={newDept.manager} onChange={e => setNewDept({...newDept, manager: e.target.value})} />
             </div>
             <div className="form-group">
               <label>上級部門 Parent Unit</label>
@@ -68,6 +78,7 @@ export default function DeptModule({ departments, onRefresh }) {
           <tr>
             <th>代碼 Code</th>
             <th>部門名稱 Name</th>
+            <th>負責人 Manager</th>
             <th>上級部門 Parent</th>
             <th>操作 Action</th>
           </tr>
@@ -77,6 +88,7 @@ export default function DeptModule({ departments, onRefresh }) {
             <tr key={dept.id}>
               <td style={{ fontWeight: 'bold' }}>{dept.dept_code}</td>
               <td>{dept.name}</td>
+              <td style={{ color: 'var(--primary)', fontWeight: '600' }}>{dept.manager || '-'}</td>
               <td>
                 {dept.parent_name ? (
                   <span style={{ color: '#64748b' }}>{dept.parent_name}</span>

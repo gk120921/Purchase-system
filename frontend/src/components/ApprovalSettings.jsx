@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Save, ShieldAlert, DollarSign } from 'lucide-react';
 
-const API_BASE = 'http://127.0.0.1:3001/api';
+const API_BASE = `http://${window.location.hostname}:3001/api`;
 
 export default function ApprovalSettings() {
   const [thresholds, setThresholds] = useState([]);

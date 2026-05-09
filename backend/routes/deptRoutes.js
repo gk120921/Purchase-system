@@ -20,12 +20,12 @@ router.get('/', async (req, res) => {
 
 // 新增部門
 router.post('/', async (req, res) => {
-    const { dept_code, name, parent_id, manager_id } = req.body;
+    const { dept_code, name, parent_id, manager } = req.body;
     try {
         const db = getDb();
         const result = await db.runAsync(
-            'INSERT INTO departments (dept_code, name, parent_id, manager_id) VALUES (?, ?, ?, ?)',
-            [dept_code, name, parent_id, manager_id]
+            'INSERT INTO departments (dept_code, name, parent_id, manager) VALUES (?, ?, ?, ?)',
+            [dept_code, name, parent_id || null, manager || null]
         );
         res.json({ id: result.lastID, message: 'Department created' });
     } catch (err) {
