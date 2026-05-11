@@ -4,7 +4,7 @@ import { Search, FileText, RotateCcw, Trash2, Eye, Calendar, User, Building2, Ch
 
 const API_BASE = `http://${window.location.hostname}:3001/api`;
 
-export default function ReviewHistoryModule({ onPreview }) {
+export default function ReviewHistoryModule({ onPreview, onVoucher }) {
     const [history, setHistory] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
@@ -133,8 +133,13 @@ export default function ReviewHistoryModule({ onPreview }) {
                                         </td>
                                         <td>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#64748b', fontSize: '0.9rem' }}>
-                                                <Calendar size={14} /> {new Date(item.created_at).toLocaleDateString()}
+                                                <Calendar size={14} /> {new Date(item.approval_date || item.created_at).toLocaleDateString()}
                                             </div>
+                                            {item.last_approver && (
+                                                <div style={{ fontSize: '0.75rem', color: '#10b981', fontWeight: 'bold', marginTop: '4px' }}>
+                                                    由 {item.last_approver} 核准
+                                                </div>
+                                            )}
                                         </td>
                                         <td>
                                             <span style={{ 
@@ -149,6 +154,11 @@ export default function ReviewHistoryModule({ onPreview }) {
                                                 <button className="btn-icon" onClick={() => onPreview(item, item.type)} title="查看詳情">
                                                     <Eye size={18} />
                                                 </button>
+                                                {item.type === 'PO' && item.status === 'approved' && (
+                                                    <button className="btn-icon" style={{ color: '#10b981' }} onClick={() => onVoucher(item)} title="查看付款憑單">
+                                                        <FileText size={18} />
+                                                    </button>
+                                                )}
                                                 <button className="btn-icon" style={{ color: '#3b82f6' }} onClick={() => handleReturn(item)} title="退回至待簽核">
                                                     <RotateCcw size={18} />
                                                 </button>

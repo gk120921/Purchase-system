@@ -87,11 +87,9 @@ export default function Sidebar({
                   <ShoppingBag size={20} /> {!sidebarCollapsed && <span>採購訂單 PO</span>}
                 </div>
               )}
-              {user.allowed_modules?.includes('history') || true && (
-                <div className={`nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-                  <FileClock size={20} /> {!sidebarCollapsed && <span>審查歷史 History</span>}
-                </div>
-              )}
+              <div className={`nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+                <FileClock size={20} /> {!sidebarCollapsed && <span>審查歷史 History</span>}
+              </div>
             </>
           )}
         </div>

@@ -9,6 +9,7 @@ import ApprovalQueue from './components/ApprovalQueue';
 import POList from './components/POList';
 import PRModal from './components/PRModal';
 import POModal from './components/POModal';
+import PaymentVoucherModal from './components/PaymentVoucherModal';
 import SubjectModule from './components/SubjectModule';
 import MaterialModule from './components/MaterialModule';
 import SupplierModule from './components/SupplierModule';
@@ -46,6 +47,8 @@ function App() {
   const [editingSubject, setEditingSubject] = useState(null);
   const [isPreview, setIsPreview] = useState(false);
   const [isPoModalOpen, setIsPoModalOpen] = useState(false);
+  const [showVoucherModal, setShowVoucherModal] = useState(false);
+  const [selectedPoForVoucher, setSelectedPoForVoucher] = useState(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [openCategories, setOpenCategories] = useState({ requisition: true, database: false, system: false });
 
@@ -118,13 +121,22 @@ function App() {
     } catch (err) { alert('簽核失敗'); }
   };
 
-  const handleEditPr = (pr) => { setIsPreview(false); setEditingPr(pr); setPrModalMode(pr.subject_id && pr.subject_id > 1 ? 'subject' : 'bom'); };
-  const handlePreviewPr = (pr) => { setIsPreview(true); setEditingPr(pr); setPrModalMode(pr.subject_id && pr.subject_id > 1 ? 'subject' : 'bom'); };
+  const handleEditPr = (pr) => { 
+    setIsPreview(false); 
+    setEditingPr(pr); 
+    setPrModalMode(pr.input_mode === 'ACCOUNTING' ? 'subject' : 'bom'); 
+  };
+  const handlePreviewPr = (pr) => { 
+    setIsPreview(true); 
+    setEditingPr(pr); 
+    setPrModalMode(pr.input_mode === 'ACCOUNTING' ? 'subject' : 'bom'); 
+  };
   const handleDeletePr = async (id) => { if (window.confirm('確定刪除？')) { await axios.delete(`${API_BASE}/pr/${id}`); fetchData(); } };
 
   // 補齊缺失的 PO 處理函數
   const handlePreviewPo = (po) => { setIsPreview(true); setEditingPo(po); setIsPoModalOpen(true); };
   const handleEditPo = (po) => { setIsPreview(false); setEditingPo(po); setIsPoModalOpen(true); };
+  const handleOpenVoucher = (po) => { setSelectedPoForVoucher(po); setShowVoucherModal(true); };
 
   if (!user) return <LoginPage onLogin={handleLogin} />;
 
@@ -184,13 +196,13 @@ function App() {
               onPreview={(item, type) => type === 'PR' ? handlePreviewPr(item) : handlePreviewPo(item)}
             />
           )}
-          {activeTab === 'po' && <POList pos={pos} onEdit={handleEditPo} onDelete={async (id) => { await axios.delete(`${API_BASE}/po/${id}`); fetchData(); }} onPreview={handlePreviewPo} />}
+          {activeTab === 'po' && <POList pos={pos} onEdit={handleEditPo} onDelete={async (id) => { await axios.delete(`${API_BASE}/po/${id}`); fetchData(); }} onPreview={handlePreviewPo} onVoucher={handleOpenVoucher} />}
           {activeTab === 'subjects' && <SubjectModule subjects={subjects} onRefresh={fetchData} onEdit={(s) => { setEditingSubject(s); setShowSubjectModal(true); }} />}
           {activeTab === 'materials' && <MaterialModule materials={materials} onRefresh={fetchData} />}
           {activeTab === 'suppliers' && <SupplierModule suppliers={suppliers} onRefresh={fetchData} onEdit={s => { setEditingSupplier(s); setShowSubjectModal(true); }} />}
           {activeTab === 'users' && <UserModule users={allUsers} onRefresh={fetchData} onEdit={u => { setEditingUser(u); setShowUserModal(true); }} />}
           {activeTab === 'pr' && <PRList prs={prs} onEdit={handleEditPr} onDelete={handleDeletePr} onPreview={handlePreviewPr} />}
-          {activeTab === 'history' && <ReviewHistoryModule onPreview={(item, type) => type === 'PR' ? handlePreviewPr(item) : handlePreviewPo(item)} />}
+          {activeTab === 'history' && <ReviewHistoryModule onPreview={(item, type) => type === 'PR' ? handlePreviewPr(item) : handlePreviewPo(item)} onVoucher={handleOpenVoucher} />}
           {activeTab === 'settings' && <ApprovalSettings />}
           {activeTab === 'export' && <ExportModule pos={pos} />}
 
@@ -199,6 +211,7 @@ function App() {
           {showSupplierModal && <SupplierModal editData={editingSupplier} suppliers={suppliers} onClose={() => setShowSupplierModal(false)} onSuccess={() => { setShowSupplierModal(false); fetchData(); }} />}
           {showUserModal && <UserModal editData={editingUser} onClose={() => setShowUserModal(false)} onSuccess={() => { setShowUserModal(false); fetchData(); }} departments={departments} allUsers={allUsers} />}
           {showSubjectModal && <SubjectModal editData={editingSubject} onClose={() => setShowSubjectModal(false)} onSuccess={() => { setShowSubjectModal(false); fetchData(); }} />}
+          {showVoucherModal && <PaymentVoucherModal po={selectedPoForVoucher} onClose={() => { setShowVoucherModal(false); setSelectedPoForVoucher(null); }} />}
         </main>
 
         {/* 建議清單 Datalists */}

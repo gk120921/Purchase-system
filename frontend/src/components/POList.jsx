@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Search, ArrowUpDown } from 'lucide-react';
 
-export default function POList({ pos, onEdit, onDelete, onPreview }) {
+export default function POList({ pos, onEdit, onDelete, onPreview, onVoucher }) {
   const [filterStatus, setFilterStatus] = useState('ALL');
   const [searchTerm, setSearchTerm] = useState('');
   const [sortOrder, setSortOrder] = useState('DESC');
@@ -143,6 +143,14 @@ export default function POList({ pos, onEdit, onDelete, onPreview }) {
                         <span>預覽</span>
                         <span style={{ fontSize: '0.6rem', opacity: 0.8 }}>PREVIEW</span>
                       </button>
+                      {po.status === 'approved' && (
+                        <button 
+                          onClick={() => onVoucher(po)}
+                          style={{ border: 'none', background: '#10b981', color: '#fff', padding: '0.4rem 0.8rem', cursor: 'pointer', fontSize: '0.7rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                          <span>付款憑單</span>
+                          <span style={{ fontSize: '0.6rem', opacity: 0.8 }}>VOUCHER</span>
+                        </button>
+                      )}
                       {(po.status === 'draft' || po.status === 'pending' || po.status === 'rejected' || !po.status) && (
                         <>
                           <button 

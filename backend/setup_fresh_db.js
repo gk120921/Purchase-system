@@ -9,7 +9,8 @@ async function setupFreshDatabase() {
         const tables = [
             'purchase_requests', 'pr_items', 'purchase_orders', 'po_items', 
             'approvals', 'users', 'accounting_subjects', 'suppliers', 
-            'materials', 'approval_thresholds', 'departments', 'approval_rules'
+            'materials', 'approval_thresholds', 'departments', 'approval_rules',
+            'payment_vouchers'
         ];
 
         console.log('Dropping existing tables...');
@@ -171,6 +172,21 @@ async function setupFreshDatabase() {
             max_amount REAL,
             flow_json TEXT,
             description TEXT
+        )`);
+
+        await db.runAsync(`CREATE TABLE payment_vouchers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            po_id INTEGER NOT NULL,
+            voucher_number TEXT UNIQUE NOT NULL,
+            payment_category TEXT DEFAULT 'Bank Transfer',
+            due_date TEXT,
+            tds_rate REAL DEFAULT 0,
+            tds_amount REAL DEFAULT 0,
+            net_amount REAL DEFAULT 0,
+            remarks TEXT,
+            status TEXT DEFAULT 'pending',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (po_id) REFERENCES purchase_orders(id)
         )`);
 
         console.log('Seeding initial admin user...');

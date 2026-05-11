@@ -9,8 +9,7 @@ router.get('/', async (req, res) => {
             SELECT pr.id, pr.pr_number, pr.requester, pr.department, 
                    pr.total_amount, pr.status, pr.created_at, pr.remarks,
                    pr.subject_id, pr.supplier_id, pr.input_mode, pr.currency, pr.exchange_rate,
-                   (SELECT remark_zh FROM pr_items WHERE pr_id = pr.id LIMIT 1) as item_remark_zh,
-                   (SELECT remark_en FROM pr_items WHERE pr_id = pr.id LIMIT 1) as item_remark_en,
+                   (SELECT GROUP_CONCAT(description, ', ') FROM pr_items WHERE pr_id = pr.id) as items_summary,
                    CASE 
                       WHEN s.id IS NOT NULL THEN (s.supplier_code || ' - ' || s.name)
                       ELSE pr.supplier_name 
@@ -125,6 +124,32 @@ router.put('/:id', async (req, res) => {
         }
         await stmt.finalizeAsync();
         res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+router.get('/:id', async (req, res) => {
+    try {
+        const db = getDb();
+        const pr = await db.getAsync(`
+            SELECT pr.*, 
+                   CASE 
+                      WHEN s.id IS NOT NULL THEN (s.supplier_code || ' - ' || s.name)
+                      ELSE pr.supplier_name 
+                   END as display_supplier, 
+                   (acc.code || ' - ' || acc.name) as display_subject 
+            FROM purchase_requests pr
+            LEFT JOIN suppliers s ON pr.supplier_id = s.id
+            LEFT JOIN accounting_subjects acc ON pr.subject_id = acc.id
+            WHERE pr.id = ?
+        `, [req.params.id]);
+        if (!pr) return res.status(404).json({ error: 'PR not found' });
+        
+        const items = await db.allAsync('SELECT * FROM pr_items WHERE pr_id = ?', [req.params.id]);
+        pr.items = items;
+        
+        res.json(pr);
     } catch (err) {
         res.status(500).json({ error: err.message });
     }

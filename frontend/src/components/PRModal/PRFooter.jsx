@@ -13,12 +13,16 @@ export default function PRFooter({
       <div style={{ marginBottom: '1.5rem', padding: '1rem', background: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
         <div style={{ fontWeight: 'bold', fontSize: '0.9rem', color: '#64748b', marginBottom: '0.5rem' }}>單據備註 (General PR Remarks)</div>
         <textarea 
+          className="no-print"
           style={{ width: '100%', padding: '0.75rem', borderRadius: '6px', border: '1px solid #cbd5e1', fontSize: '0.9rem', minHeight: '80px', resize: 'vertical' }}
           placeholder="請輸入此筆請購單的整體備註... Enter general remarks for this PR..."
           value={formData.remarks}
           disabled={isPreview}
           onChange={(e) => setFormData({...formData, remarks: e.target.value})}
         />
+        <div className="print-only" style={{ padding: '0.75rem', border: '1px solid #cbd5e1', borderRadius: '6px', minHeight: '80px', whiteSpace: 'pre-wrap', fontSize: '0.9rem' }}>
+            {formData.remarks || '(無備註 No remarks)'}
+        </div>
       </div>
       
       {!isPreview && (

@@ -17,19 +17,53 @@ router.get('/', async (req, res) => {
 
         // 整合 PR 歷史
         const prHistory = await db.allAsync(`
-            SELECT 'PR' as type, id, pr_number as number, requester, department, 
-                   total_amount, status, created_at, remarks,
-                   currency, exchange_rate
-            FROM purchase_requests
-            WHERE status IN ('approved', 'converted', 'rejected')
-            ${whereClause}
-        `, params);
+            SELECT 
+                'PR' as type, 
+                pr.id as id, 
+                pr.pr_number as number, 
+                pr.pr_number as pr_number, 
+                pr.requester as requester, 
+                pr.department as department, 
+                pr.total_amount as total_amount, 
+                pr.status as status, 
+                pr.created_at as created_at, 
+                pr.remarks as remarks,
+                pr.currency as currency, 
+                pr.exchange_rate as exchange_rate, 
+                pr.input_mode as input_mode,
+                (SELECT approver FROM approval_history WHERE target_type = 'PR' AND target_id = pr.id ORDER BY created_at DESC LIMIT 1) as last_approver,
+                (SELECT created_at FROM approval_history WHERE target_type = 'PR' AND target_id = pr.id ORDER BY created_at DESC LIMIT 1) as approval_date
+            FROM purchase_requests pr
+            WHERE pr.status IN ('approved', 'converted', 'rejected')
+            ${search ? 'AND (pr.pr_number LIKE ? OR pr.requester LIKE ? OR pr.department LIKE ?)' : ''}
+        `, search ? [`%${search}%`, `%${search}%`, `%${search}%`] : []);
 
         // 整合 PO 歷史
         const poHistory = await db.allAsync(`
-            SELECT 'PO' as type, po.id, po.po_number as number, pr.requester, pr.department, 
-                   po.total_amount, po.status, po.created_at, po.remarks,
-                   po.currency, po.exchange_rate
+            SELECT 
+                'PO' as type, 
+                po.id as id, 
+                po.po_number as number, 
+                po.po_number as po_number, 
+                pr.pr_number as pr_number, 
+                pr.requester as requester, 
+                pr.department as department, 
+                po.total_amount as total_amount, 
+                po.status as status, 
+                po.created_at as created_at, 
+                po.remarks as remarks,
+                po.currency as currency, 
+                po.exchange_rate as exchange_rate, 
+                po.subtotal as subtotal, 
+                po.supplier_name as supplier_name,
+                po.cgst_rate as cgst_rate, 
+                po.sgst_rate as sgst_rate, 
+                po.cgst_amount as cgst_amount, 
+                po.sgst_amount as sgst_amount, 
+                po.shipping_fee as shipping_fee,
+                (SELECT name FROM suppliers WHERE id = po.supplier_id) as display_supplier,
+                (SELECT approver FROM approval_history WHERE target_type = 'PO' AND target_id = po.id ORDER BY created_at DESC LIMIT 1) as last_approver,
+                (SELECT created_at FROM approval_history WHERE target_type = 'PO' AND target_id = po.id ORDER BY created_at DESC LIMIT 1) as approval_date
             FROM purchase_orders po
             LEFT JOIN purchase_requests pr ON po.pr_id = pr.id
             WHERE po.status IN ('approved', 'closed', 'rejected')
@@ -37,7 +71,7 @@ router.get('/', async (req, res) => {
         `, search ? [`%${search}%`, `%${search}%`, `%${search}%`] : []);
 
         // 整合兩者並按日期排序
-        const combined = [...prHistory, ...poHistory].sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+        const combined = [...prHistory, ...poHistory].sort((a, b) => new Date(b.approval_date || b.created_at) - new Date(a.approval_date || a.created_at));
         
         res.json(combined);
     } catch (err) {
