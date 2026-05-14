@@ -32,11 +32,14 @@ export default function UserModal({ editData, onClose, onSuccess, departments: i
     { key: 'pr', label: '請購管理' },
     { key: 'approvals', label: '待簽核' },
     { key: 'po', label: '採購訂單' },
+    { key: 'history', label: '審查歷史' },
     { key: 'subjects', label: '會計科目' },
     { key: 'materials', label: '物料清單' },
     { key: 'departments', label: '組織架構' },
     { key: 'suppliers', label: '供應商' },
+    { key: 'units', label: '單位管理' },
     { key: 'users', label: '人員管理' },
+    { key: 'settings', label: '審核設定' },
     { key: 'export', label: '總表匯出' }
   ];
 

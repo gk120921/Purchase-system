@@ -1,6 +1,44 @@
 const express = require('express');
-const router = express.Router();
 const { getDb } = require('../database');
+const router = express.Router();
+
+// 核心生成函數：絕對不允許使用 Date.now()
+async function generatePRNumber(db) {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}${mm}${dd}`;
+    const pattern = `PR-${todayStr}%`;
+    
+    const lastPR = await db.getAsync(
+        "SELECT pr_number FROM purchase_requests WHERE pr_number LIKE ? ORDER BY id DESC LIMIT 1", 
+        [pattern]
+    );
+    
+    let nextSeq = "001";
+    if (lastPR && lastPR.pr_number) {
+        const lastPart = lastPR.pr_number.split('-').pop();
+        const seqPart = lastPart.substring(8);
+        if (!isNaN(parseInt(seqPart))) {
+            nextSeq = String(parseInt(seqPart, 10) + 1).padStart(3, '0');
+        }
+    }
+    const finalNum = `PR-${todayStr}${nextSeq}`;
+    console.log(`[NumberGenerator] Generated New PR Number: ${finalNum}`);
+    return finalNum;
+}
+
+// 取得下一個 PR 單號 (用於預覽)
+router.get('/next-number', async (req, res) => {
+    try {
+        const db = getDb();
+        const next = await generatePRNumber(db);
+        res.json({ next });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
 
 router.get('/', async (req, res) => {
     try {
@@ -31,7 +69,8 @@ router.post('/', async (req, res) => {
     const { requester, department, subject_id, supplier_id, items, remarks, input_mode = 'BOM', currency = 'INR', exchange_rate = 1.0 } = req.body;
     try {
         const db = getDb();
-        const pr_number = `PR-${Date.now()}`;
+        const pr_number = await generatePRNumber(db);
+        
         const total_amount = (items || []).reduce((sum, item) => sum + (parseFloat(item.quantity) * (parseFloat(item.unit_price) || 0)), 0);
         
         const thresholds = await db.allAsync('SELECT * FROM approval_thresholds WHERE dept_code IS NULL OR dept_code = ? ORDER BY min_amount DESC', [department]);

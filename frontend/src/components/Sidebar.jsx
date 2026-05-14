@@ -16,7 +16,8 @@ import {
   ShieldCheck,
   Package,
   GitMerge,
-  FileClock
+  FileClock,
+  Scale
 } from 'lucide-react';
 
 export default function Sidebar({ 
@@ -87,9 +88,11 @@ export default function Sidebar({
                   <ShoppingBag size={20} /> {!sidebarCollapsed && <span>採購訂單 PO</span>}
                 </div>
               )}
-              <div className={`nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-                <FileClock size={20} /> {!sidebarCollapsed && <span>審查歷史 History</span>}
-              </div>
+              {user.allowed_modules?.includes('history') && (
+                <div className={`nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
+                  <FileClock size={20} /> {!sidebarCollapsed && <span>審查歷史 History</span>}
+                </div>
+              )}
             </>
           )}
         </div>
@@ -121,6 +124,11 @@ export default function Sidebar({
               {user.allowed_modules?.includes('suppliers') && (
                 <div className={`nav-item ${activeTab === 'suppliers' ? 'active' : ''}`} onClick={() => setActiveTab('suppliers')}>
                   <Users size={20} /> {!sidebarCollapsed && <span>供應商名冊 Suppliers</span>}
+                </div>
+              )}
+              {user.allowed_modules?.includes('units') && (
+                <div className={`nav-item ${activeTab === 'units' ? 'active' : ''}`} onClick={() => setActiveTab('units')}>
+                  <Scale size={20} /> {!sidebarCollapsed && <span>單位管理 Units</span>}
                 </div>
               )}
             </>

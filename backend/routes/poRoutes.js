@@ -2,6 +2,44 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../database');
 
+// 核心生成函數
+async function generatePONumber(db) {
+    const now = new Date();
+    const yyyy = now.getFullYear();
+    const mm = String(now.getMonth() + 1).padStart(2, '0');
+    const dd = String(now.getDate()).padStart(2, '0');
+    const todayStr = `${yyyy}${mm}${dd}`;
+    const pattern = `PO-${todayStr}%`;
+    
+    const lastPO = await db.getAsync(
+        "SELECT po_number FROM purchase_orders WHERE po_number LIKE ? ORDER BY id DESC LIMIT 1", 
+        [pattern]
+    );
+    
+    let nextSeq = "001";
+    if (lastPO && lastPO.po_number) {
+        const lastPart = lastPO.po_number.split('-').pop();
+        const seqPart = lastPart.substring(8);
+        if (!isNaN(parseInt(seqPart))) {
+            nextSeq = String(parseInt(seqPart, 10) + 1).padStart(3, '0');
+        }
+    }
+    const finalNum = `PO-${todayStr}${nextSeq}`;
+    console.log(`[NumberGenerator] Generated New PO Number: ${finalNum}`);
+    return finalNum;
+}
+
+// 取得下一個 PO 單號
+router.get('/next-number', async (req, res) => {
+    try {
+        const db = getDb();
+        const next = await generatePONumber(db);
+        res.json({ next });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 router.get('/', async (req, res) => {
     try {
         const db = getDb();
@@ -42,7 +80,7 @@ router.post('/', async (req, res) => {
     } = req.body;
     try {
         const db = getDb();
-        const po_number = `PO-${Date.now()}`;
+        const po_number = await generatePONumber(db);
         
         const result = await db.runAsync(
             `INSERT INTO purchase_orders (

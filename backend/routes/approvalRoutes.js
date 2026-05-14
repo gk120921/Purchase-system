@@ -55,7 +55,30 @@ router.post('/', async (req, res) => {
                 
                 console.log(`[Approval] Converting PR ${pr.pr_number} to PO. Items found: ${prItems.length}`);
                 
-                const po_number = `PO-${Date.now()}`;
+                // 生成 PO 流水號 PO-YYYYMMDDXXX
+                const now = new Date();
+                const y = now.getFullYear();
+                const m = String(now.getMonth() + 1).padStart(2, '0');
+                const d = String(now.getDate()).padStart(2, '0');
+                const todayStr = `${y}${m}${d}`;
+                const pattern = `PO-${todayStr}%`;
+                
+                const lastPO = await db.getAsync(
+                    "SELECT po_number FROM purchase_orders WHERE po_number LIKE ? ORDER BY id DESC LIMIT 1", 
+                    [pattern]
+                );
+                
+                let po_number;
+                let nextSeq = "001";
+                if (lastPO && lastPO.po_number) {
+                    const lastPart = lastPO.po_number.split('-').pop();
+                    const seqPart = lastPart.substring(8);
+                    if (!isNaN(parseInt(seqPart))) {
+                        nextSeq = String(parseInt(seqPart, 10) + 1).padStart(3, '0');
+                    }
+                }
+                po_number = `PO-${todayStr}${nextSeq}`;
+
                 const subtotal = pr.total_amount || 0;
                 const cgst_amount = subtotal * 0.09;
                 const sgst_amount = subtotal * 0.09;
@@ -71,7 +94,7 @@ router.post('/', async (req, res) => {
                     [
                         po_number, pr.id, supplier_id, supplier_name, pr.requester, pr.department, 
                         subtotal, 9, 9, cgst_amount, sgst_amount, 0, total_with_tax, 
-                        `From ${pr.pr_number}: ${pr.remarks || ''}`, 'pending', pr.currency || 'INR', pr.exchange_rate || 1.0
+                        pr.remarks || '', 'pending', pr.currency || 'INR', pr.exchange_rate || 1.0
                     ]
                 );
                 

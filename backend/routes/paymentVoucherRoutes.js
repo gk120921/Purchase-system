@@ -2,6 +2,17 @@ const express = require('express');
 const router = express.Router();
 const { getDb } = require('../database');
 
+// 獲取所有付款憑單
+router.get('/', async (req, res) => {
+    try {
+        const db = getDb();
+        const vouchers = await db.allAsync('SELECT * FROM payment_vouchers ORDER BY id DESC');
+        res.json(vouchers);
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // 獲取付款憑單 (根據 PO ID)
 router.get('/po/:po_id', async (req, res) => {
     try {
@@ -12,7 +23,13 @@ router.get('/po/:po_id', async (req, res) => {
             const po = await db.getAsync('SELECT * FROM purchase_orders WHERE id = ?', [req.params.po_id]);
             if (!po) return res.status(404).json({ error: 'PO not found' });
             
-            const voucher_number = `PV-${new Date().toISOString().slice(0,10).replace(/-/g, '')}-${req.params.po_id}`;
+            const now = new Date();
+            const y = now.getFullYear();
+            const m = String(now.getMonth() + 1).padStart(2, '0');
+            const d = String(now.getDate()).padStart(2, '0');
+            const todayStr = `${y}${m}${d}`;
+            const voucher_number = `PV-${todayStr}-${req.params.po_id}`;
+            
             await db.runAsync(
                 `INSERT INTO payment_vouchers (po_id, voucher_number, net_amount, status) 
                  VALUES (?, ?, ?, ?)`,

@@ -23,6 +23,7 @@ import Sidebar from './components/Sidebar';
 import ErrorBoundary from './components/ErrorBoundary';
 import DeptModule from './components/DeptModule';
 import ReviewHistoryModule from './components/ReviewHistoryModule';
+import UnitModule from './components/UnitModule';
 
 const API_BASE = `http://${window.location.hostname}:3001/api`;
 
@@ -36,6 +37,7 @@ function App() {
   const [allUsers, setAllUsers] = useState([]);
   const [materials, setMaterials] = useState([]);
   const [departments, setDepartments] = useState([]);
+  const [units, setUnits] = useState([]);
   const [prModalMode, setPrModalMode] = useState(null);
   const [showSupplierModal, setShowSupplierModal] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
@@ -69,17 +71,26 @@ function App() {
   const fetchData = async () => {
     const fetchBase = async () => {
       try {
-        const [sRes, subRes, prRes, poRes, matRes] = await Promise.all([
-          axios.get(`${API_BASE}/suppliers`), axios.get(`${API_BASE}/subjects`),
-          axios.get(`${API_BASE}/pr`), axios.get(`${API_BASE}/po`),
-          axios.get(`${API_BASE}/materials`)
+        const results = await Promise.allSettled([
+          axios.get(`${API_BASE}/suppliers`),
+          axios.get(`${API_BASE}/subjects`),
+          axios.get(`${API_BASE}/pr`),
+          axios.get(`${API_BASE}/po`),
+          axios.get(`${API_BASE}/materials`),
+          axios.get(`${API_BASE}/units`)
         ]);
-        setSuppliers(Array.isArray(sRes.data) ? sRes.data : []);
-        setSubjects(Array.isArray(subRes.data) ? subRes.data : []);
-        setPrs(Array.isArray(prRes.data) ? prRes.data : []);
-        setPos(Array.isArray(poRes.data) ? poRes.data : []);
-        setMaterials(Array.isArray(matRes.data) ? matRes.data : []);
-      } catch (err) { console.error('Base data fetch failed:', err); }
+
+        if (results[0].status === 'fulfilled') setSuppliers(Array.isArray(results[0].value.data) ? results[0].value.data : []);
+        if (results[1].status === 'fulfilled') setSubjects(Array.isArray(results[1].value.data) ? results[1].value.data : []);
+        if (results[2].status === 'fulfilled') setPrs(Array.isArray(results[2].value.data) ? results[2].value.data : []);
+        if (results[3].status === 'fulfilled') setPos(Array.isArray(results[3].value.data) ? results[3].value.data : []);
+        if (results[4].status === 'fulfilled') setMaterials(Array.isArray(results[4].value.data) ? results[4].value.data : []);
+        if (results[5].status === 'fulfilled') setUnits(Array.isArray(results[5].value.data) ? results[5].value.data : []);
+        
+        results.forEach((r, idx) => {
+          if (r.status === 'rejected') console.error(`Fetch failed for index ${idx}:`, r.reason);
+        });
+      } catch (err) { console.error('Base data fetch critical failure:', err); }
     };
 
     const fetchDepts = async () => {
@@ -181,6 +192,9 @@ function App() {
               {activeTab === 'users' && (
                 <button className="btn btn-primary" onClick={() => { setEditingUser(null); setShowUserModal(true); }}>+ 新增人員 User</button>
               )}
+              {activeTab === 'suppliers' && (
+                <button className="btn btn-primary" onClick={() => { setEditingSupplier(null); setShowSupplierModal(true); }}>+ 新增供應商 Supplier</button>
+              )}
             </div>
           </header>
 
@@ -199,12 +213,13 @@ function App() {
           {activeTab === 'po' && <POList pos={pos} onEdit={handleEditPo} onDelete={async (id) => { await axios.delete(`${API_BASE}/po/${id}`); fetchData(); }} onPreview={handlePreviewPo} onVoucher={handleOpenVoucher} />}
           {activeTab === 'subjects' && <SubjectModule subjects={subjects} onRefresh={fetchData} onEdit={(s) => { setEditingSubject(s); setShowSubjectModal(true); }} />}
           {activeTab === 'materials' && <MaterialModule materials={materials} onRefresh={fetchData} />}
-          {activeTab === 'suppliers' && <SupplierModule suppliers={suppliers} onRefresh={fetchData} onEdit={s => { setEditingSupplier(s); setShowSubjectModal(true); }} />}
+          {activeTab === 'suppliers' && <SupplierModule suppliers={suppliers} onRefresh={fetchData} onEdit={s => { setEditingSupplier(s); setShowSupplierModal(true); }} />}
           {activeTab === 'users' && <UserModule users={allUsers} onRefresh={fetchData} onEdit={u => { setEditingUser(u); setShowUserModal(true); }} />}
           {activeTab === 'pr' && <PRList prs={prs} onEdit={handleEditPr} onDelete={handleDeletePr} onPreview={handlePreviewPr} />}
           {activeTab === 'history' && <ReviewHistoryModule onPreview={(item, type) => type === 'PR' ? handlePreviewPr(item) : handlePreviewPo(item)} onVoucher={handleOpenVoucher} />}
           {activeTab === 'settings' && <ApprovalSettings />}
           {activeTab === 'export' && <ExportModule pos={pos} />}
+          {activeTab === 'units' && <UnitModule units={units} onRefresh={fetchData} />}
 
           {prModalMode && <PRModal mode={prModalMode} user={user} editData={editingPr} isPreview={isPreview} onClose={() => { setPrModalMode(null); setEditingPr(null); setIsPreview(false); }} suppliers={suppliers} subjects={subjects} materials={materials} onSuccess={() => { setPrModalMode(null); setEditingPr(null); setIsPreview(false); fetchData(); }} />}
           {isPoModalOpen && <POModal user={user} editData={editingPo} isPreview={isPreview} onClose={() => { setIsPoModalOpen(false); setEditingPo(null); setIsPreview(false); }} suppliers={suppliers} materials={materials} onSuccess={() => { setIsPoModalOpen(false); setEditingPo(null); setIsPreview(false); fetchData(); }} />}
@@ -226,6 +241,18 @@ function App() {
           {suppliers.map(s => (
             <option key={s.id} value={s.supplier_code ? `${s.supplier_code} - ${s.name}` : s.name} />
           ))}
+        </datalist>
+        <datalist id="unit-datalist">
+          {units.map(u => (
+            <option key={u.id} value={u.name} />
+          ))}
+          {/* 只顯示單位管理中未定義但在物料資料中存在的單位 (去重) */}
+          {Array.from(new Set(materials.map(m => m.unit).filter(Boolean)))
+            .filter(mu => !units.some(u => u.name === mu))
+            .map(u => (
+              <option key={`mat-${u}`} value={u} />
+            ))
+          }
         </datalist>
       </div>
     </ErrorBoundary>

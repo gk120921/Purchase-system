@@ -26,6 +26,7 @@ const dashboardRoutes = require('./routes/dashboardRoutes');
 const deptRoutes = require('./routes/deptRoutes');
 const historyRoutes = require('./routes/historyRoutes');
 const paymentVoucherRoutes = require('./routes/paymentVoucherRoutes');
+const unitRoutes = require('./routes/unitRoutes');
 
 
 // API Routes Mapping
@@ -44,6 +45,7 @@ app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/departments', deptRoutes);
 app.use('/api/history', historyRoutes);
 app.use('/api/payment-vouchers', paymentVoucherRoutes);
+app.use('/api/units', unitRoutes);
 
 
 // Initialize DB and Start Server

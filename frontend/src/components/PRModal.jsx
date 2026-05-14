@@ -13,7 +13,7 @@ export default function PRModal({ mode, user, editData, isPreview, onClose, supp
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const dd = String(today.getDate()).padStart(2, '0');
   const dateStr = editData ? new Date(editData.created_at).toLocaleDateString() : `${yyyy}/${mm}/${dd}`;
-  const prNumberStr = editData ? editData.pr_number : `${yyyy}${mm}${dd}001`;
+  const prNumberStr = editData ? editData.pr_number : `PR-${yyyy}${mm}${dd}...`;
 
   const [inputMode, setInputMode] = useState(editData?.input_mode || (mode === 'subject' ? 'ACCOUNTING' : 'BOM'));
   const [formData, setFormData] = useState({
@@ -28,6 +28,18 @@ export default function PRModal({ mode, user, editData, isPreview, onClose, supp
   });
 
   const [approvalHistory, setApprovalHistory] = useState([]);
+  
+  useEffect(() => {
+    if (!editData) {
+      axios.get(`${API_BASE}/pr/next-number`)
+        .then(res => {
+          if (res.data.next) {
+            setFormData(prev => ({ ...prev, pr_number: res.data.next }));
+          }
+        })
+        .catch(err => console.error('Failed to fetch next PR number', err));
+    }
+  }, [editData]);
 
   // 簽核進度條組件
   const ApprovalStepper = () => {
@@ -77,7 +89,7 @@ export default function PRModal({ mode, user, editData, isPreview, onClose, supp
         const populateData = (items) => {
           const currentItems = (items && items.length > 0) ? items.map(i => ({
             ...i,
-            material_number: i.description || i.material_number || '',
+            material_number: i.material_number || i.description || '',
             demand: i.quantity || 0,
             unit_price: i.unit_price || ''
           })) : [{ material_number: '', demand: '', unit: (currentMode === 'subject' ? 'PCS' : 'KG'), demand_day: '', purchase_quantity: '', manufacturer: '', date_of_purchase: '', remark_zh: '', remark_en: '', unit_price: '', subject_id: '' }];
@@ -199,13 +211,28 @@ export default function PRModal({ mode, user, editData, isPreview, onClose, supp
             overflow: visible !important;
             height: auto !important;
           }
-          input, select, textarea {
-            border: none !important;
-            background: transparent !important;
-            padding: 0 !important;
+        .print-only { display: none !important; }
+        @media print {
+          .no-print { display: none !important; }
+          .print-only { 
+            display: block !important; 
+            visibility: visible !important;
+            white-space: normal !important;
+            word-break: break-all !important;
+          }
+          input, select, textarea, button.no-print {
+            display: none !important;
+          }
+          table {
+            font-size: 0.7rem !important;
+            table-layout: fixed !important;
+            width: 100% !important;
+          }
+          th, td {
+            padding: 2px !important;
+            overflow: visible !important;
           }
         }
-        .print-only { display: none; }
       `}</style>
       <div className="pr-container card" style={{ width: '1200px', maxWidth: '98vw', maxHeight: 'none', padding: '2.5rem', background: '#fff', borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', position: 'relative' }}>
         <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem', gap: '1rem' }}>
@@ -232,7 +259,7 @@ export default function PRModal({ mode, user, editData, isPreview, onClose, supp
             </label>
           </div>
 
-          <PRTable formData={formData} setFormData={setFormData} inputMode={inputMode} isPreview={isPreview} subjects={subjects} handleTranslate={handleTranslate} getSubjectName={getSubjectName} />
+          <PRTable formData={formData} setFormData={setFormData} inputMode={inputMode} isPreview={isPreview} subjects={subjects} handleTranslate={handleTranslate} getSubjectName={getSubjectName} materials={materials} />
           <PRFooter formData={formData} setFormData={setFormData} inputMode={inputMode} isPreview={isPreview} onClose={onClose} handleSubmit={handleSubmit} />
 
           {/* 簽核歷程區塊 */}

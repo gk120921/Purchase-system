@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Search, FileText, RotateCcw, Trash2, Eye, Calendar, User, Building2, ChevronRight } from 'lucide-react';
+import { Search, FileText, RotateCcw, Trash2, Eye, Calendar, User, Building2, ChevronRight, ArrowUpDown, ChevronUp, ChevronDown } from 'lucide-react';
 
 const API_BASE = `http://${window.location.hostname}:3001/api`;
 
@@ -8,6 +8,9 @@ export default function ReviewHistoryModule({ onPreview, onVoucher }) {
     const [history, setHistory] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(false);
+    const [filterType, setFilterType] = useState('ALL'); // ALL, PR, PO
+    const [sortOrder, setSortOrder] = useState('DESC'); // DESC, ASC (created_at/approval_date)
+    const [headerSort, setHeaderSort] = useState({ field: null, direction: 'DESC' }); // For column specific sorting
 
     const fetchHistory = async () => {
         setLoading(true);
@@ -26,6 +29,49 @@ export default function ReviewHistoryModule({ onPreview, onVoucher }) {
     useEffect(() => {
         fetchHistory();
     }, []);
+
+    const handleHeaderSort = (field) => {
+        if (headerSort.field === field) {
+            setHeaderSort({ field, direction: headerSort.direction === 'ASC' ? 'DESC' : 'ASC' });
+        } else {
+            setHeaderSort({ field, direction: 'DESC' });
+        }
+    };
+
+    const filteredAndSortedHistory = history
+        .filter(item => {
+            const matchType = filterType === 'ALL' || item.type === filterType;
+            const searchLower = searchTerm.toLowerCase();
+            const matchSearch = 
+                item.number.toLowerCase().includes(searchLower) ||
+                item.requester.toLowerCase().includes(searchLower) ||
+                item.department.toLowerCase().includes(searchLower);
+            return matchType && matchSearch;
+        })
+        .sort((a, b) => {
+            // Priority 1: Header Sort
+            if (headerSort.field) {
+                let valA = a[headerSort.field];
+                let valB = b[headerSort.field];
+
+                if (headerSort.field === 'approval_date' || headerSort.field === 'created_at') {
+                    valA = new Date(valA || 0).getTime();
+                    valB = new Date(valB || 0).getTime();
+                } else if (headerSort.field === 'total_amount') {
+                    valA = Number(valA) || 0;
+                    valB = Number(valB) || 0;
+                }
+
+                if (valA < valB) return headerSort.direction === 'ASC' ? -1 : 1;
+                if (valA > valB) return headerSort.direction === 'ASC' ? 1 : -1;
+                return 0;
+            }
+
+            // Priority 2: Global Date Sort
+            const dateA = new Date(a.approval_date || a.created_at).getTime();
+            const dateB = new Date(b.approval_date || b.created_at).getTime();
+            return sortOrder === 'DESC' ? dateB - dateA : dateA - dateB;
+        });
 
     const handleReturn = async (item) => {
         if (!window.confirm(`確定將單據 ${item.number} 退回至待簽核清單？`)) return;
@@ -58,40 +104,82 @@ export default function ReviewHistoryModule({ onPreview, onVoucher }) {
         }
     };
 
+    const SortIndicator = ({ field }) => {
+        if (headerSort.field !== field) return <ArrowUpDown size={12} style={{ marginLeft: '4px', opacity: 0.3 }} />;
+        return headerSort.direction === 'ASC' ? <ChevronUp size={12} style={{ marginLeft: '4px' }} /> : <ChevronDown size={12} style={{ marginLeft: '4px' }} />;
+    };
+
     return (
         <div className="module-container animate-fade-in">
             <div className="card">
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', flexWrap: 'wrap', gap: '1rem' }}>
                     <div>
-                        <h3 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.5rem' }}>審查歷史紀錄</h3>
-                        <p style={{ color: 'var(--text-muted)' }}>檢視、搜尋與管理所有已結案的請購單與採購單</p>
+                        <h3 style={{ fontSize: '1.5rem', fontWeight: '800', color: 'var(--text-main)', marginBottom: '0.25rem' }}>審查歷史紀錄</h3>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>檢視、搜尋與管理所有已結案的請購單與採購單</p>
                     </div>
-                    <div style={{ display: 'flex', gap: '1rem' }}>
+                    <div style={{ display: 'flex', gap: '0.75rem', alignItems: 'center' }}>
                         <div style={{ position: 'relative' }}>
-                            <Search style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} size={18} />
+                            <Search style={{ position: 'absolute', left: '0.75rem', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} size={16} />
                             <input 
                                 type="text" 
                                 placeholder="搜尋單號、人員、部門..." 
                                 className="form-input" 
-                                style={{ paddingLeft: '3rem', minWidth: '300px' }}
+                                style={{ paddingLeft: '2.5rem', minWidth: '250px', height: '40px' }}
                                 value={searchTerm}
                                 onChange={(e) => setSearchTerm(e.target.value)}
                                 onKeyDown={(e) => e.key === 'ENTER' && fetchHistory()}
                             />
                         </div>
-                        <button className="btn btn-primary" onClick={fetchHistory}>查詢 Query</button>
+                        <button className="btn btn-primary" style={{ height: '40px' }} onClick={fetchHistory}>查詢 Query</button>
                     </div>
                 </div>
 
-                <div className="table-wrapper">
+                {/* Filter and Global Sort Bar */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem', background: '#f8fafc', padding: '0.75rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                        {['ALL', 'PR', 'PO'].map(type => (
+                            <button 
+                                key={type}
+                                onClick={() => setFilterType(type)}
+                                style={{ 
+                                    padding: '0.5rem 1.25rem', 
+                                    border: 'none', 
+                                    borderRadius: '8px', 
+                                    fontSize: '0.85rem', 
+                                    fontWeight: 'bold',
+                                    cursor: 'pointer',
+                                    background: filterType === type ? 'var(--primary)' : 'transparent',
+                                    color: filterType === type ? '#fff' : '#64748b',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                {type === 'ALL' ? '全部 ALL' : type}
+                            </button>
+                        ))}
+                    </div>
+                    <button 
+                        onClick={() => setSortOrder(prev => prev === 'DESC' ? 'ASC' : 'DESC')}
+                        style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', padding: '0.5rem 1rem', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', cursor: 'pointer', fontSize: '0.85rem', color: '#64748b', fontWeight: '600' }}
+                    >
+                        <ArrowUpDown size={14} /> {sortOrder === 'DESC' ? '由新到舊 Newest' : '由舊到新 Oldest'}
+                    </button>
+                </div>
+
+                <div className="table-wrapper" style={{ boxShadow: 'none', border: '1px solid #e2e8f0', borderRadius: '12px', overflow: 'hidden' }}>
                     <table className="table">
                         <thead>
-                            <tr>
-                                <th>類型 Type</th>
-                                <th>單號 Number</th>
+                            <tr style={{ background: '#f1f5f9' }}>
+                                <th style={{ cursor: 'default' }}>類型 Type</th>
+                                <th style={{ cursor: 'pointer' }} onClick={() => handleHeaderSort('number')}>
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>單號 Number <SortIndicator field="number" /></div>
+                                </th>
                                 <th>申請人/單位 Requester/Dept</th>
-                                <th>總金額 Amount</th>
-                                <th>簽核日期 Date</th>
+                                <th style={{ cursor: 'pointer' }} onClick={() => handleHeaderSort('total_amount')}>
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>總金額 Amount <SortIndicator field="total_amount" /></div>
+                                </th>
+                                <th style={{ cursor: 'pointer' }} onClick={() => handleHeaderSort('approval_date')}>
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>簽核日期 Date <SortIndicator field="approval_date" /></div>
+                                </th>
                                 <th>狀態 Status</th>
                                 <th style={{ textAlign: 'center' }}>操作 Actions</th>
                             </tr>
@@ -99,9 +187,9 @@ export default function ReviewHistoryModule({ onPreview, onVoucher }) {
                         <tbody>
                             {loading ? (
                                 <tr><td colSpan="7" style={{ textAlign: 'center', padding: '3rem' }}>讀取中...</td></tr>
-                            ) : history.length === 0 ? (
+                            ) : filteredAndSortedHistory.length === 0 ? (
                                 <tr><td colSpan="7" style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>尚無結案紀錄</td></tr>
-                            ) : history.map((item) => {
+                            ) : filteredAndSortedHistory.map((item) => {
                                 const style = getStatusStyle(item.status);
                                 return (
                                     <tr key={`${item.type}-${item.id}`} className="hover-row">

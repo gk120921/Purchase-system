@@ -6,6 +6,11 @@ dist/
 # Database
 *.db
 *.db-journal
+*.sqlite
+*.bak
+
+# Excel
+~$*.xlsx
 
 # Logs
 *.log
