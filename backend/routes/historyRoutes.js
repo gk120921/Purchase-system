@@ -85,13 +85,43 @@ router.post('/return/:type/:id', async (req, res) => {
     const { type, id } = req.params;
     try {
         const db = getDb();
+        
+        // 1. 先清除該單據目前所有的簽核任務 (避免重複)
+        await db.runAsync("DELETE FROM approvals WHERE target_type = ? AND target_id = ?", [type, id]);
+
         if (type === 'PR') {
+            // 2a. 更新 PR 狀態
             await db.runAsync('UPDATE purchase_requests SET status = "dept_pending" WHERE id = ?', [id]);
+            
+            // 3a. 重新尋找該部門的經理來簽核
+            const pr = await db.getAsync("SELECT department FROM purchase_requests WHERE id = ?", [id]);
+            const dept = await db.getAsync("SELECT manager FROM departments WHERE name = ?", [pr.department]);
+            const manager = dept ? dept.manager : 'tkchen'; // 預設給 tkchen
+
+            await db.runAsync(
+                "INSERT INTO approvals (target_type, target_id, approver, status) VALUES ('PR', ?, ?, 'pending')",
+                [id, manager]
+            );
         } else {
+            // 2b. 更新 PO 狀態
             await db.runAsync('UPDATE purchase_orders SET status = "pending" WHERE id = ?', [id]);
+            
+            // 3b. 重新指派給經理 (固定為 tkchen)
+            await db.runAsync(
+                "INSERT INTO approvals (target_type, target_id, approver, status) VALUES ('PO', ?, 'tkchen', 'pending')",
+                [id]
+            );
         }
+
+        // 4. 在歷史紀錄中留下一筆「退回」的紀錄
+        await db.runAsync(
+            "INSERT INTO approval_history (target_type, target_id, approver, status, comment) VALUES (?, ?, '系統系統', 'rejected', '從審查歷史退回待簽核')",
+            [type, id]
+        );
+
         res.json({ success: true, message: '單據已成功退回至待簽核清單' });
     } catch (err) {
+        console.error('Return Error:', err);
         res.status(500).json({ error: err.message });
     }
 });

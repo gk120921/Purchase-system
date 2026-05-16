@@ -7,7 +7,7 @@ router.get('/', async (req, res) => {
     try {
         const db = getDb();
         const rows = await db.allAsync(`
-            SELECT d.*, p.name as parent_name 
+            SELECT d.*, p.name as parent_name, p.name_en as parent_name_en
             FROM departments d 
             LEFT JOIN departments p ON d.parent_id = p.id
         `);
@@ -20,12 +20,12 @@ router.get('/', async (req, res) => {
 
 // 新增部門
 router.post('/', async (req, res) => {
-    const { dept_code, name, parent_id, manager } = req.body;
+    const { dept_code, name, name_en, parent_id, manager } = req.body;
     try {
         const db = getDb();
         const result = await db.runAsync(
-            'INSERT INTO departments (dept_code, name, parent_id, manager) VALUES (?, ?, ?, ?)',
-            [dept_code, name, parent_id || null, manager || null]
+            'INSERT INTO departments (dept_code, name, name_en, parent_id, manager) VALUES (?, ?, ?, ?, ?)',
+            [dept_code, name, name_en || null, parent_id || null, manager || null]
         );
         res.json({ id: result.lastID, message: 'Department created' });
     } catch (err) {
@@ -40,6 +40,22 @@ router.delete('/:id', async (req, res) => {
         await db.runAsync('DELETE FROM departments WHERE id = ?', [req.params.id]);
         res.json({ message: 'Department deleted' });
     } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// 修改部門
+router.put('/:id', async (req, res) => {
+    const { dept_code, name, name_en, parent_id, manager } = req.body;
+    try {
+        const db = getDb();
+        await db.runAsync(
+            'UPDATE departments SET dept_code = ?, name = ?, name_en = ?, parent_id = ?, manager = ? WHERE id = ?',
+            [dept_code, name, name_en || null, parent_id || null, manager || null, req.params.id]
+        );
+        res.json({ message: 'Department updated' });
+    } catch (err) {
+        console.error('Update Dept Error:', err);
         res.status(500).json({ error: err.message });
     }
 });

@@ -193,8 +193,24 @@ export default function PaymentVoucherModal({ po, onClose }) {
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.5rem', fontSize: '0.85rem' }}>
           <div>
             <div>付款幣別: <span style={{ fontWeight: 'bold' }}>{po.currency || 'INR'}</span></div>
-            <div style={{ fontSize: '0.75rem', color: '#666' }}>Payment Category: {po.currency}</div>
+            <div style={{ fontSize: '0.75rem', color: '#666' }}>Payment Currency: {po.currency}</div>
           </div>
+          {po.currency !== 'INR' && (
+            <div style={{ textAlign: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <span>付款匯率 (Exch. Rate):</span>
+                <input 
+                  type="number" 
+                  className="no-print"
+                  step="0.01"
+                  value={voucher.exchange_rate || po.exchange_rate || 1.0} 
+                  onChange={(e) => updateVoucherField('exchange_rate', e.target.value)} 
+                  style={{ width: '80px', border: '1px solid #ccc', padding: '2px 4px', fontWeight: 'bold', textAlign: 'center' }}
+                />
+                <span className="print-only" style={{ fontWeight: 'bold' }}>{voucher.exchange_rate}</span>
+              </div>
+            </div>
+          )}
           <div style={{ textAlign: 'right' }}>
             <div>{new Date().toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })}</div>
           </div>
@@ -278,7 +294,16 @@ export default function PaymentVoucherModal({ po, onClose }) {
                 <span style={{ fontSize: '0.7rem' }}>Payment Amount:</span>
               </td>
               <td style={{ textAlign: 'right', fontWeight: 'bold', fontSize: '1rem' }}>
-                {po.currency === 'INR' ? '₹' : (po.currency === 'USD' ? '$' : '')} {grandTotal.toLocaleString()}
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end' }}>
+                  <div style={{ color: po.currency !== 'INR' ? '#666' : '#000', fontSize: po.currency !== 'INR' ? '0.85rem' : '1rem' }}>
+                    {po.currency === 'INR' ? '₹' : (po.currency === 'USD' ? '$' : '')} {grandTotal.toLocaleString()}
+                  </div>
+                  {po.currency !== 'INR' && (
+                    <div style={{ color: '#1e3a8a', borderTop: '1px solid #ccc', marginTop: '4px', paddingTop: '4px' }}>
+                      ₹ {(grandTotal * (parseFloat(voucher.exchange_rate) || 1.0)).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (INR)
+                    </div>
+                  )}
+                </div>
               </td>
               <td>
                 <div style={{ fontSize: '0.7rem' }}>TDS Rate:</div>

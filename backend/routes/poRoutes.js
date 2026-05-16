@@ -76,7 +76,8 @@ router.get('/:id/items', async (req, res) => {
 router.post('/', async (req, res) => {
     const { 
         pr_id, supplier_id, supplier_name, requester, department, items, remarks, currency, exchange_rate, 
-        subtotal, cgst_rate, sgst_rate, cgst_amount, sgst_amount, shipping_fee, total_amount 
+        subtotal, cgst_rate, sgst_rate, cgst_amount, sgst_amount, shipping_fee, total_amount,
+        shipping_remark_zh, shipping_remark_en, excluding_tax_amount
     } = req.body;
     try {
         const db = getDb();
@@ -87,13 +88,15 @@ router.post('/', async (req, res) => {
                 po_number, pr_id, supplier_id, supplier_name, requester, department,
                 subtotal, cgst_rate, sgst_rate, 
                 cgst_amount, sgst_amount, shipping_fee, total_amount, 
-                remarks, status, currency, exchange_rate
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                remarks, status, currency, exchange_rate,
+                shipping_remark_zh, shipping_remark_en, excluding_tax_amount
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
                 po_number, pr_id, supplier_id, supplier_name, requester, department,
                 subtotal || 0, cgst_rate || 9, sgst_rate || 9, 
                 cgst_amount || 0, sgst_amount || 0, shipping_fee || 0, total_amount || 0, 
-                remarks, 'pending', currency, exchange_rate
+                remarks, 'pending', currency, exchange_rate,
+                shipping_remark_zh, shipping_remark_en, excluding_tax_amount || 0
             ]
         );
         
@@ -132,7 +135,8 @@ router.post('/', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const { 
         supplier_id, supplier_name, requester, department, items, remarks, currency, exchange_rate, 
-        subtotal, cgst_rate, sgst_rate, cgst_amount, sgst_amount, shipping_fee, total_amount, status 
+        subtotal, cgst_rate, sgst_rate, cgst_amount, sgst_amount, shipping_fee, total_amount, status,
+        shipping_remark_zh, shipping_remark_en, excluding_tax_amount
     } = req.body;
     try {
         const db = getDb();
@@ -141,13 +145,15 @@ router.put('/:id', async (req, res) => {
                 supplier_id = ?, supplier_name = ?, requester = ?, department = ?,
                 subtotal = ?, cgst_rate = ?, sgst_rate = ?, 
                 cgst_amount = ?, sgst_amount = ?, shipping_fee = ?, total_amount = ?, 
-                remarks = ?, status = ?, currency = ?, exchange_rate = ?
+                remarks = ?, status = ?, currency = ?, exchange_rate = ?,
+                shipping_remark_zh = ?, shipping_remark_en = ?, excluding_tax_amount = ?
             WHERE id = ?`,
             [
                 supplier_id, supplier_name, requester, department,
                 subtotal || 0, cgst_rate || 9, sgst_rate || 9, 
                 cgst_amount || 0, sgst_amount || 0, shipping_fee || 0, total_amount || 0, 
-                remarks, status || 'pending', currency, exchange_rate, req.params.id
+                remarks, status || 'pending', currency, exchange_rate, 
+                shipping_remark_zh, shipping_remark_en, excluding_tax_amount || 0, req.params.id
             ]
         );
 

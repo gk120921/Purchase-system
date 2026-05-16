@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
-import * as xlsx from 'xlsx';
+import * as XLSX from 'xlsx';
 import axios from 'axios';
 import { Calendar, Filter, FileSpreadsheet, Download } from 'lucide-react';
 
-const API_BASE = 'http://localhost:3001/api';
+const API_BASE = `http://${window.location.hostname}:3001/api`;
 
 export default function ExportModule() {
   const [loading, setLoading] = useState(false);
+  const [exportType, setExportType] = useState('PO'); // 'PO' or 'PR'
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [statusFilter, setStatusFilter] = useState('ALL');
@@ -14,62 +15,31 @@ export default function ExportModule() {
   const handleExport = async () => {
     setLoading(true);
     try {
-      const res = await axios.get(`${API_BASE}/export/po-details`);
-      let data = res.data;
+      // Build query string
+      const params = new URLSearchParams({
+        type: exportType,
+        startDate: startDate || '',
+        endDate: endDate || '',
+        status: statusFilter || 'ALL'
+      });
 
-      // Local filtering
-      if (startDate) {
-        data = data.filter(d => new Date(d.po_date) >= new Date(startDate));
-      }
-      if (endDate) {
-        data = data.filter(d => new Date(d.po_date) <= new Date(endDate));
-      }
-      if (statusFilter !== 'ALL') {
-        data = data.filter(d => (d.status || 'draft').toUpperCase() === statusFilter);
-      }
-
-      if (data.length === 0) {
-        alert('此篩選條件下無資料可匯出 / No data found for selected filters.');
-        setLoading(false);
-        return;
-      }
-
-      // Format for Excel according to screenshot
-      const excelData = data.map((row, index) => ({
-        'S.No': index + 1,
-        'PO 建立 Date': new Date(row.po_date).toLocaleDateString(),
-        'PO No': row.po_number,
-        'PR No': row.pr_number || '-',
-        '供應商名稱 Name': row.supplier_name || '-',
-        '供應商代碼 Supplies Code': row.supplier_code || '-',
-        'Details': `${row.material_number || ''} ${row.description || ''}`.trim(),
-        'UNIT': row.unit || '-',
-        'QTY': row.quantity || 0,
-        '單價': row.unit_price || 0,
-        '科目代碼 (Code)': row.subject_code || '-',
-        'REMARKS': row.remark_zh || '-',
-        '狀態': (row.status || 'draft').toUpperCase()
-      }));
-
-      const ws = xlsx.utils.json_to_sheet(excelData);
+      const downloadUrl = `${API_BASE}/export/download-excel?${params.toString()}`;
       
-      // Auto-size columns (rough estimate)
-      const colWidths = Object.keys(excelData[0]).map(key => ({
-        wch: Math.max(key.length, 15)
-      }));
-      ws['!cols'] = colWidths;
+      console.log("Triggering download from:", downloadUrl);
 
-      const wb = xlsx.utils.book_new();
-      xlsx.utils.book_append_sheet(wb, ws, "Procurement_Summary");
-      
-      const fileName = `KST_Summary_${new Date().toISOString().split('T')[0]}.xlsx`;
-      xlsx.writeFile(wb, fileName);
+      // Method 1: Simple window.location for best reliability
+      // This will trigger the browser's native download handler
+      window.location.href = downloadUrl;
+
+      // Give some feedback
+      alert(`已發送匯出請求，請查看瀏覽器下載列。\nExport request sent. Please check your browser's download bar.`);
+
     } catch (err) {
       console.error('Export error:', err);
-      const msg = err.response?.data?.message || err.message;
-      alert(`匯出失敗 / Export Failed: ${msg}`);
+      alert(`匯出失敗 / Export Failed: ${err.message}`);
     } finally {
-      setLoading(false);
+      // We set a timeout because window.location.href doesn't "finish" in a way we can catch
+      setTimeout(() => setLoading(false), 2000);
     }
   };
 
@@ -84,6 +54,22 @@ export default function ExportModule() {
             <h2 style={{ margin: 0, fontSize: '1.5rem', fontWeight: 900, color: '#1e3a8a' }}>採購總表匯出中心</h2>
             <p style={{ margin: 0, color: '#64748b', fontSize: '0.9rem' }}>Export Center /採購汇总导出</p>
           </div>
+        </div>
+
+        {/* Export Type Toggle */}
+        <div style={{ display: 'flex', background: '#f1f5f9', padding: '0.5rem', borderRadius: '12px', marginBottom: '2rem' }}>
+          <button 
+            onClick={() => setExportType('PO')}
+            style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: exportType === 'PO' ? '#fff' : 'transparent', color: exportType === 'PO' ? '#1e3a8a' : '#64748b', fontWeight: 'bold', cursor: 'pointer', boxShadow: exportType === 'PO' ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}
+          >
+            採購總表 (PO Summary)
+          </button>
+          <button 
+            onClick={() => setExportType('PR')}
+            style={{ flex: 1, padding: '0.75rem', borderRadius: '8px', border: 'none', background: exportType === 'PR' ? '#fff' : 'transparent', color: exportType === 'PR' ? '#1e3a8a' : '#64748b', fontWeight: 'bold', cursor: 'pointer', boxShadow: exportType === 'PR' ? '0 4px 6px -1px rgba(0,0,0,0.1)' : 'none', transition: 'all 0.2s' }}
+          >
+            請購總表 (PR Summary)
+          </button>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem', marginBottom: '2rem' }}>
@@ -119,10 +105,22 @@ export default function ExportModule() {
               style={{ width: '100%', padding: '0.75rem', borderRadius: '8px', border: '1px solid #cbd5e1', fontSize: '1rem', background: '#fff' }}
             >
               <option value="ALL">全部 (ALL)</option>
-              <option value="APPROVED">已核准 (APPROVED)</option>
-              <option value="PENDING">待簽核 (PENDING)</option>
-              <option value="DRAFT">草稿 (DRAFT)</option>
-              <option value="REJECTED">已退回 (REJECTED)</option>
+              {exportType === 'PO' ? (
+                <>
+                  <option value="APPROVED">已核准 (APPROVED)</option>
+                  <option value="PENDING">待簽核 (PENDING)</option>
+                  <option value="DRAFT">草稿 (DRAFT)</option>
+                  <option value="REJECTED">已退回 (REJECTED)</option>
+                </>
+              ) : (
+                <>
+                  <option value="APPROVED">已核准 (APPROVED)</option>
+                  <option value="PENDING">待審核 (PENDING)</option>
+                  <option value="CONVERTED">已轉 PO (CONVERTED)</option>
+                  <option value="DRAFT">草稿 (DRAFT)</option>
+                  <option value="REJECTED">已駁回 (REJECTED)</option>
+                </>
+              )}
             </select>
           </div>
         </div>
@@ -130,12 +128,11 @@ export default function ExportModule() {
         <div style={{ background: '#f8fafc', padding: '1.5rem', borderRadius: '12px', border: '1px dashed #cbd5e1', marginBottom: '2rem' }}>
           <h4 style={{ margin: '0 0 0.5rem 0', color: '#1e3a8a' }}>預設導出格式說明：</h4>
           <ul style={{ margin: 0, paddingLeft: '1.2rem', color: '#64748b', fontSize: '0.85rem', lineHeight: '1.6' }}>
-            <li>包含所有明細資料 (S.No, Date, PO/PR No, Supplier, Details, Qty, Price, Account Subject, etc.)</li>
+            <li>包含所有明細資料 ({exportType === 'PO' ? 'PO No, PR No, Supplier, etc.' : 'PR No, Requester, Department, etc.'})</li>
             <li>自動根據您的篩選條件進行過濾。</li>
             <li>格式已對齊公司標準會計報表格式。</li>
           </ul>
         </div>
-
         <button 
           onClick={handleExport} 
           disabled={loading}
@@ -146,10 +143,14 @@ export default function ExportModule() {
             '正在處理中 Processing...'
           ) : (
             <>
-              <Download size={20} /> 立即匯出總表 (Export to Excel)
+              <Download size={20} /> 立即匯出{exportType === 'PO' ? '採購' : '請購'}總表 (Export to Excel)
             </>
           )}
         </button>
+
+        <div style={{ marginTop: '1.5rem', textAlign: 'right', color: '#cbd5e1', fontSize: '0.75rem' }}>
+          System Engine: v2.5 - Backend Export Mode
+        </div>
       </div>
     </div>
   );

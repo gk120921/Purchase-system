@@ -28,7 +28,8 @@ export default function Sidebar({
   setSidebarCollapsed, 
   openCategories, 
   toggleCategory, 
-  handleLogout 
+  handleLogout,
+  lang
 }) {
   return (
     <div className={`sidebar ${sidebarCollapsed ? 'collapsed' : ''}`} style={{ transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1)' }}>
@@ -60,7 +61,11 @@ export default function Sidebar({
         {user.allowed_modules?.includes('dashboard') && (
           <div className={`nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
             <LayoutDashboard size={20} />
-            {!sidebarCollapsed && <span>儀表板 Dashboard</span>}
+            {!sidebarCollapsed && (
+              <span>
+                {lang === 'CN' ? '儀表板' : lang === 'EN' ? 'Dashboard' : '儀表板 (Dashboard)'}
+              </span>
+            )}
           </div>
         )}
 
@@ -68,29 +73,30 @@ export default function Sidebar({
         <div style={{ marginTop: '0.75rem' }}>
           {!sidebarCollapsed && (
             <div className="sidebar-group-label" style={{ padding: '0.5rem 0.75rem', fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => toggleCategory('requisition')}>
-              單據管理 REQUISITION {openCategories.requisition ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {lang === 'CN' ? '單據管理' : lang === 'EN' ? 'REQUISITION' : '單據管理 (REQUISITION)'} 
+              {openCategories.requisition ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </div>
           )}
           {(openCategories.requisition || sidebarCollapsed) && (
             <>
               {user.allowed_modules?.includes('pr') && (
                 <div className={`nav-item ${activeTab === 'pr' ? 'active' : ''}`} onClick={() => setActiveTab('pr')}>
-                  <FileText size={20} /> {!sidebarCollapsed && <span>請購管理 PR</span>}
+                  <FileText size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '請購管理' : lang === 'EN' ? 'PR' : '請購管理 (PR)'}</span>}
                 </div>
               )}
               {user.allowed_modules?.includes('approvals') && (
                 <div className={`nav-item ${activeTab === 'approvals' ? 'active' : ''}`} onClick={() => setActiveTab('approvals')}>
-                  <CheckSquare size={20} /> {!sidebarCollapsed && <span>待簽核佇列 Approvals</span>}
+                  <CheckSquare size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '待簽核' : lang === 'EN' ? 'Approvals' : '待簽核 (Approvals)'}</span>}
                 </div>
               )}
               {user.allowed_modules?.includes('po') && (
                 <div className={`nav-item ${activeTab === 'po' ? 'active' : ''}`} onClick={() => setActiveTab('po')}>
-                  <ShoppingBag size={20} /> {!sidebarCollapsed && <span>採購訂單 PO</span>}
+                  <ShoppingBag size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '採購訂單' : lang === 'EN' ? 'PO' : '採購訂單 (PO)'}</span>}
                 </div>
               )}
               {user.allowed_modules?.includes('history') && (
                 <div className={`nav-item ${activeTab === 'history' ? 'active' : ''}`} onClick={() => setActiveTab('history')}>
-                  <FileClock size={20} /> {!sidebarCollapsed && <span>審查歷史 History</span>}
+                  <FileClock size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '審查歷史' : lang === 'EN' ? 'History' : '審查歷史 (History)'}</span>}
                 </div>
               )}
             </>
@@ -101,34 +107,35 @@ export default function Sidebar({
         <div style={{ marginTop: '0.75rem' }}>
           {!sidebarCollapsed && (
             <div className="sidebar-group-label" style={{ padding: '0.5rem 0.75rem', fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => toggleCategory('database')}>
-              資料庫 DATABASE {openCategories.database ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {lang === 'CN' ? '資料庫' : lang === 'EN' ? 'DATABASE' : '資料庫 (DATABASE)'}
+              {openCategories.database ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </div>
           )}
           {(openCategories.database || sidebarCollapsed) && (
             <>
-              {user.allowed_modules?.includes('subjects') && (
+              {(user.role === 'admin' || user.allowed_modules?.includes('subjects')) && (
                 <div className={`nav-item ${activeTab === 'subjects' ? 'active' : ''}`} onClick={() => setActiveTab('subjects')}>
-                  <Database size={20} /> {!sidebarCollapsed && <span>會計科目 Subjects</span>}
+                  <Database size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '會計科目' : lang === 'EN' ? 'Subjects' : '會計科目 (Subjects)'}</span>}
                 </div>
               )}
-              {user.allowed_modules?.includes('materials') && (
+              {(user.role === 'admin' || user.allowed_modules?.includes('materials')) && (
                 <div className={`nav-item ${activeTab === 'materials' ? 'active' : ''}`} onClick={() => setActiveTab('materials')}>
-                  <Package size={20} /> {!sidebarCollapsed && <span>物料清單 BOM</span>}
+                  <Package size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '物料清單' : lang === 'EN' ? 'BOM' : '物料清單 (BOM)'}</span>}
                 </div>
               )}
-              {user.allowed_modules?.includes('departments') && (
+              {(user.role === 'admin' || user.allowed_modules?.includes('departments')) && (
                 <div className={`nav-item ${activeTab === 'departments' ? 'active' : ''}`} onClick={() => setActiveTab('departments')}>
-                  <GitMerge size={20} /> {!sidebarCollapsed && <span>組織架構 Hierarchy</span>}
+                  <GitMerge size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '組織架構' : lang === 'EN' ? 'Hierarchy' : '組織架構 (Hierarchy)'}</span>}
                 </div>
               )}
-              {user.allowed_modules?.includes('suppliers') && (
+              {(user.role === 'admin' || user.allowed_modules?.includes('suppliers')) && (
                 <div className={`nav-item ${activeTab === 'suppliers' ? 'active' : ''}`} onClick={() => setActiveTab('suppliers')}>
-                  <Users size={20} /> {!sidebarCollapsed && <span>供應商名冊 Suppliers</span>}
+                  <Users size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '供應商名冊' : lang === 'EN' ? 'Suppliers' : '供應商名冊 (Suppliers)'}</span>}
                 </div>
               )}
-              {user.allowed_modules?.includes('units') && (
+              {(user.role === 'admin' || user.allowed_modules?.includes('units')) && (
                 <div className={`nav-item ${activeTab === 'units' ? 'active' : ''}`} onClick={() => setActiveTab('units')}>
-                  <Scale size={20} /> {!sidebarCollapsed && <span>單位管理 Units</span>}
+                  <Scale size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '單位管理' : lang === 'EN' ? 'Units' : '單位管理 (Units)'}</span>}
                 </div>
               )}
             </>
@@ -139,24 +146,25 @@ export default function Sidebar({
         <div style={{ marginTop: '0.75rem' }}>
           {!sidebarCollapsed && (
             <div className="sidebar-group-label" style={{ padding: '0.5rem 0.75rem', fontSize: '0.7rem', color: '#64748b', fontWeight: 'bold', display: 'flex', justifyContent: 'space-between', cursor: 'pointer' }} onClick={() => toggleCategory('system')}>
-              系統設定 SYSTEM {openCategories.system ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
+              {lang === 'CN' ? '系統設定' : lang === 'EN' ? 'SYSTEM' : '系統設定 (SYSTEM)'}
+              {openCategories.system ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
             </div>
           )}
           {(openCategories.system || sidebarCollapsed) && (
             <>
               {user.allowed_modules?.includes('users') && (
                 <div className={`nav-item ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>
-                  <ShieldCheck size={20} /> {!sidebarCollapsed && <span>人員管理 Users</span>}
+                  <ShieldCheck size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '人員管理' : lang === 'EN' ? 'Users' : '人員管理 (Users)'}</span>}
                 </div>
               )}
               {user.allowed_modules?.includes('settings') && (
                 <div className={`nav-item ${activeTab === 'settings' ? 'active' : ''}`} onClick={() => setActiveTab('settings')}>
-                  <Settings size={20} /> {!sidebarCollapsed && <span>審核設定 Settings</span>}
+                  <Settings size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '審核設定' : lang === 'EN' ? 'Settings' : '審核設定 (Settings)'}</span>}
                 </div>
               )}
               {user.allowed_modules?.includes('export') && (
                 <div className={`nav-item ${activeTab === 'export' ? 'active' : ''}`} onClick={() => setActiveTab('export')}>
-                  <FileSpreadsheet size={20} /> {!sidebarCollapsed && <span>總表匯出 Export</span>}
+                  <FileSpreadsheet size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '總表匯出' : lang === 'EN' ? 'Export' : '總表匯出 (Export)'}</span>}
                 </div>
               )}
             </>
@@ -164,7 +172,7 @@ export default function Sidebar({
         </div>
 
         <div className="nav-item" onClick={handleLogout} style={{ marginTop: 'auto', borderTop: '1px solid rgba(255,255,255,0.05)', color: '#ff8080' }}>
-          <LogOut size={20} /> {!sidebarCollapsed && <span>登出系統 Logout</span>}
+          <LogOut size={20} /> {!sidebarCollapsed && <span>{lang === 'CN' ? '登出系統' : lang === 'EN' ? 'Logout' : '登出系統 (Logout)'}</span>}
         </div>
       </div>
     </div>

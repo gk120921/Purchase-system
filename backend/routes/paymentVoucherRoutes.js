@@ -31,9 +31,9 @@ router.get('/po/:po_id', async (req, res) => {
             const voucher_number = `PV-${todayStr}-${req.params.po_id}`;
             
             await db.runAsync(
-                `INSERT INTO payment_vouchers (po_id, voucher_number, net_amount, status) 
-                 VALUES (?, ?, ?, ?)`,
-                [req.params.po_id, voucher_number, po.total_amount, 'pending']
+                `INSERT INTO payment_vouchers (po_id, voucher_number, net_amount, status, exchange_rate) 
+                 VALUES (?, ?, ?, ?, ?)`,
+                [req.params.po_id, voucher_number, po.total_amount, 'pending', po.exchange_rate || 1.0]
             );
             voucher = await db.getAsync('SELECT * FROM payment_vouchers WHERE po_id = ?', [req.params.po_id]);
         }
@@ -47,7 +47,7 @@ router.get('/po/:po_id', async (req, res) => {
 router.put('/:id', async (req, res) => {
     const { 
         payment_category, due_date, tds_rate, tds_amount, net_amount, 
-        remarks, status, authorized_by, requested_by, reviewed_by 
+        remarks, status, authorized_by, requested_by, reviewed_by, exchange_rate 
     } = req.body;
     try {
         const db = getDb();
@@ -62,11 +62,12 @@ router.put('/:id', async (req, res) => {
                 status = ?,
                 authorized_by = ?,
                 requested_by = ?,
-                reviewed_by = ?
+                reviewed_by = ?,
+                exchange_rate = ?
             WHERE id = ?`,
             [
                 payment_category, due_date, tds_rate, tds_amount, net_amount, 
-                remarks, status, authorized_by, requested_by, reviewed_by, req.params.id
+                remarks, status, authorized_by, requested_by, reviewed_by, exchange_rate || 1.0, req.params.id
             ]
         );
         res.json({ success: true });

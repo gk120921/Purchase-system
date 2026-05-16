@@ -7,7 +7,7 @@ import PRFooter from './PRModal/PRFooter';
 
 const API_BASE = `http://${window.location.hostname}:3001/api`;
 
-export default function PRModal({ mode, user, editData, isPreview, onClose, suppliers, subjects, materials, onSuccess }) {
+export default function PRModal({ mode, user, editData, isPreview, onClose, suppliers, subjects, materials, units, onSuccess }) {
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, '0');
@@ -16,6 +16,8 @@ export default function PRModal({ mode, user, editData, isPreview, onClose, supp
   const prNumberStr = editData ? editData.pr_number : `PR-${yyyy}${mm}${dd}...`;
 
   const [inputMode, setInputMode] = useState(editData?.input_mode || (mode === 'subject' ? 'ACCOUNTING' : 'BOM'));
+  const round2 = (num) => Math.round((parseFloat(num) || 0) * 100) / 100;
+
   const [formData, setFormData] = useState({
     pr_number: prNumberStr,
     requester: editData ? editData.requester : user.name,
@@ -24,7 +26,7 @@ export default function PRModal({ mode, user, editData, isPreview, onClose, supp
     remarks: editData ? editData.remarks : '',
     currency: editData?.currency || 'INR',
     exchange_rate: editData?.exchange_rate || 1.0,
-    items: [{ material_number: '', demand: '', unit: (mode === 'subject' ? 'PCS' : 'KG'), demand_day: '', purchase_quantity: '', manufacturer: '', date_of_purchase: '', remark_zh: '', remark_en: '', unit_price: '', subject_id: '' }]
+    items: [{ material_number: '', demand: '', unit: (mode === 'subject' ? 'NOS' : 'KG'), demand_day: '', purchase_quantity: '', manufacturer: '', date_of_purchase: '', remark_zh: '', remark_en: '', unit_price: '', subject_id: '' }]
   });
 
   const [approvalHistory, setApprovalHistory] = useState([]);
@@ -91,8 +93,9 @@ export default function PRModal({ mode, user, editData, isPreview, onClose, supp
             ...i,
             material_number: i.material_number || i.description || '',
             demand: i.quantity || 0,
-            unit_price: i.unit_price || ''
-          })) : [{ material_number: '', demand: '', unit: (currentMode === 'subject' ? 'PCS' : 'KG'), demand_day: '', purchase_quantity: '', manufacturer: '', date_of_purchase: '', remark_zh: '', remark_en: '', unit_price: '', subject_id: '' }];
+            unit_price: round2(i.unit_price || i.price),
+            total: round2(i.total)
+          })) : [{ material_number: '', demand: '', unit: (currentMode === 'subject' ? 'NOS' : 'KG'), demand_day: '', purchase_quantity: '', manufacturer: '', date_of_purchase: '', remark_zh: '', remark_en: '', unit_price: '', subject_id: '' }];
 
           const next = {
             pr_number: fullData.pr_number || editData.number || '',
@@ -178,60 +181,80 @@ export default function PRModal({ mode, user, editData, isPreview, onClose, supp
     <div className="pr-modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 100, overflowY: 'auto', padding: '2rem 0' }}>
       <style>{`
         @media print {
-          .no-print { display: none !important; }
-          .print-only { display: block !important; }
-          .sidebar, .header, .main-content > div:not(.pr-modal-overlay) {
+          /* 1. Hide the entire application UI */
+          .sidebar, .header, .app-container > *:not(.main-content), 
+          .main-content > *:not(.pr-modal-overlay) {
             display: none !important;
           }
-          .app-container, .main-content {
-            display: block !important;
-            padding: 0 !important;
+
+          /* 2. Reset containers to allow modal to be the top-level element */
+          html, body, #root, .app-container, .main-content {
+            height: auto !important;
             margin: 0 !important;
+            padding: 0 !important;
             overflow: visible !important;
+            display: block !important;
           }
+
+          /* 3. Modal Overlay reset */
           .pr-modal-overlay {
-            position: absolute !important;
-            top: 0 !important;
-            left: 0 !important;
-            width: 100% !important;
+            position: static !important;
+            display: block !important;
             background: white !important;
             padding: 0 !important;
             margin: 0 !important;
-            display: block !important;
-            overflow: visible !important;
-            height: auto !important;
+            width: 100% !important;
           }
+
+          /* 4. PR Container (The actual paper) */
           .pr-container {
+            position: static !important;
             width: 100% !important;
             max-width: none !important;
             box-shadow: none !important;
             border: none !important;
             margin: 0 !important;
             padding: 1cm !important;
-            overflow: visible !important;
-            height: auto !important;
+            background: white !important;
           }
-        .print-only { display: none !important; }
-        @media print {
-          .no-print { display: none !important; }
-          .print-only { 
-            display: block !important; 
-            visibility: visible !important;
-            white-space: normal !important;
-            word-break: break-all !important;
-          }
-          input, select, textarea, button.no-print {
+
+          /* 5. Handle specific class visibility */
+          .no-print {
             display: none !important;
           }
+
+          .print-only {
+            display: block !important;
+            visibility: visible !important;
+          }
+
+          /* 6. UI elements to hide */
+          input, select, textarea, button, .lucide, [role="button"] {
+            display: none !important;
+          }
+
+          /* 7. Table optimizations for print */
           table {
-            font-size: 0.7rem !important;
-            table-layout: fixed !important;
             width: 100% !important;
+            border-collapse: collapse !important;
+            table-layout: fixed !important;
+            font-size: 10pt !important;
+            page-break-inside: auto !important;
+          }
+          tr {
+            page-break-inside: avoid !important;
+            page-break-after: auto !important;
           }
           th, td {
-            padding: 2px !important;
+            border: 1px solid #000 !important;
+            padding: 6px !important;
             overflow: visible !important;
           }
+        }
+
+        /* Normal view styles */
+        .print-only {
+          display: none;
         }
       `}</style>
       <div className="pr-container card" style={{ width: '1200px', maxWidth: '98vw', maxHeight: 'none', padding: '2.5rem', background: '#fff', borderRadius: '24px', boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)', position: 'relative' }}>
@@ -259,7 +282,7 @@ export default function PRModal({ mode, user, editData, isPreview, onClose, supp
             </label>
           </div>
 
-          <PRTable formData={formData} setFormData={setFormData} inputMode={inputMode} isPreview={isPreview} subjects={subjects} handleTranslate={handleTranslate} getSubjectName={getSubjectName} materials={materials} />
+          <PRTable formData={formData} setFormData={setFormData} inputMode={inputMode} isPreview={isPreview} subjects={subjects} suppliers={suppliers} handleTranslate={handleTranslate} getSubjectName={getSubjectName} materials={materials} units={units} />
           <PRFooter formData={formData} setFormData={setFormData} inputMode={inputMode} isPreview={isPreview} onClose={onClose} handleSubmit={handleSubmit} />
 
           {/* 簽核歷程區塊 */}

@@ -1,16 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, CheckCircle2, Circle, Clock, MessageSquare, CheckCircle, Printer } from 'lucide-react';
 import axios from 'axios';
 
 const API_BASE = `http://${window.location.hostname}:3001/api`;
 
-export default function POModal({ user, editData, isPreview, onClose, suppliers = [], materials = [], onSuccess }) {
+export default function POModal({ user, editData, isPreview, onClose, suppliers = [], materials = [], units = [], onSuccess }) {
   const today = new Date();
   const yyyy = today.getFullYear();
   const mm = String(today.getMonth() + 1).padStart(2, '0');
   const dd = String(today.getDate()).padStart(2, '0');
   
   const dateStr = editData ? new Date(editData.created_at).toLocaleDateString() : `${yyyy}/${mm}/${dd}`;
+  const round2 = (num) => Math.round((parseFloat(num) || 0) * 100) / 100;
   
   const [formData, setFormData] = useState({
     po_number: editData ? (editData.po_number || editData.number || '') : `PO-${yyyy}${mm}${dd}...`,
@@ -23,12 +24,19 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
     exchange_rate: editData?.exchange_rate || 1.0,
     cgst_rate: editData?.cgst_rate !== undefined ? editData.cgst_rate : 9,
     sgst_rate: editData?.sgst_rate !== undefined ? editData.sgst_rate : 9,
-    shipping_fee: editData?.shipping_fee || 0,
-    items: [{ material_number: '', description: '', quantity: 0, unit: 'PCS', unit_price: 0, total: 0, remark_zh: '', remark_en: '' }]
+    shipping_fee: round2(editData?.shipping_fee),
+    shipping_remark_zh: editData?.shipping_remark_zh || '',
+    shipping_remark_en: editData?.shipping_remark_en || '',
+    excluding_tax_amount: round2(editData?.excluding_tax_amount),
+    cgst_amount: round2(editData?.cgst_amount),
+    sgst_amount: round2(editData?.sgst_amount),
+    total_amount: round2(editData?.total_amount),
+    items: [{ material_number: '', description: '', quantity: 0, unit: 'NOS', unit_price: 0, total: 0, remark_zh: '', remark_en: '' }]
   });
 
   const [approvalHistory, setApprovalHistory] = useState([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  // 移除不再需要的 Ref
   
   useEffect(() => {
     if (!editData) {
@@ -63,10 +71,18 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
               exchange_rate: fullData.exchange_rate || prev.exchange_rate || 1.0,
               cgst_rate: fullData.cgst_rate !== undefined ? fullData.cgst_rate : (prev.cgst_rate !== undefined ? prev.cgst_rate : 9),
               sgst_rate: fullData.sgst_rate !== undefined ? fullData.sgst_rate : (prev.sgst_rate !== undefined ? prev.sgst_rate : 9),
-              shipping_fee: fullData.shipping_fee || prev.shipping_fee || 0,
+              shipping_fee: round2(fullData.shipping_fee || prev.shipping_fee),
+              shipping_remark_zh: fullData.shipping_remark_zh || prev.shipping_remark_zh || '',
+              shipping_remark_en: fullData.shipping_remark_en || prev.shipping_remark_en || '',
+              excluding_tax_amount: round2(fullData.excluding_tax_amount || prev.excluding_tax_amount),
+              cgst_amount: round2(fullData.cgst_amount || prev.cgst_amount),
+              sgst_amount: round2(fullData.sgst_amount || prev.sgst_amount),
+              total_amount: round2(fullData.total_amount || prev.total_amount),
               items: (items && items.length > 0) ? items.map(i => ({
                 ...i,
                 material_number: i.material_number || i.description || '',
+                unit_price: round2(i.unit_price),
+                total: round2(i.total),
                 remark_zh: i.remark_zh || '',
                 remark_en: i.remark_en || ''
               })) : prev.items
@@ -123,8 +139,8 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
       const sgstRate = parseFloat(formData.sgst_rate) || 0;
       const shipping = parseFloat(formData.shipping_fee) || 0;
       
-      const cgst_amount = subtotalVal * (cgstRate / 100);
-      const sgst_amount = subtotalVal * (sgstRate / 100);
+      const cgst_amount = parseFloat(formData.cgst_amount);
+      const sgst_amount = parseFloat(formData.sgst_amount);
       const total_amount = subtotalVal + cgst_amount + sgst_amount + shipping;
 
       // 供應商查找
@@ -133,6 +149,7 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
         return val === formData.supplier_id;
       });
 
+      const finalTotalAmount = parseFloat(formData.total_amount);
       const payload = {
         requester: formData.requester,
         department: formData.department,
@@ -148,7 +165,10 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
         cgst_amount,
         sgst_amount,
         shipping_fee: shipping,
-        total_amount,
+        shipping_remark_zh: formData.shipping_remark_zh,
+        shipping_remark_en: formData.shipping_remark_en,
+        excluding_tax_amount: parseFloat(formData.excluding_tax_amount) || 0,
+        total_amount: Math.round((isNaN(finalTotalAmount) ? total_amount : finalTotalAmount) * 100) / 100,
         items: formData.items.map(i => ({
           ...i,
           quantity: parseFloat(i.quantity) || 0,
@@ -174,17 +194,49 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
     }
   };
 
+  const handleTranslate = async (text, direction) => {
+    if (!text) return '';
+    try {
+      const res = await fetch(`https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=${direction}`);
+      const data = await res.json();
+      return data.responseData.translatedText;
+    } catch (e) {
+      console.error('Translate error', e);
+      return '';
+    }
+  };
+
   const calculateSubtotal = (items) => {
-    return items.reduce((sum, i) => sum + (parseFloat(i.quantity) * parseFloat(i.unit_price) || 0), 0);
+    const sum = items.reduce((sum, i) => sum + (parseFloat(i.quantity) * parseFloat(i.unit_price) || 0), 0);
+    return Math.round(sum * 100) / 100;
+  };
+
+  // 新增：顯式觸發總額計算的函數
+  const updateTotalAmount = (updatedFormData) => {
+    const subtotal = calculateSubtotal(updatedFormData.items);
+    const excluding = parseFloat(updatedFormData.excluding_tax_amount || 0);
+    const taxableSubtotal = subtotal - excluding;
+    
+    const cgst = Math.round(taxableSubtotal * (parseFloat(updatedFormData.cgst_rate || 0) / 100));
+    const sgst = Math.round(taxableSubtotal * (parseFloat(updatedFormData.sgst_rate || 0) / 100));
+    const ship = parseFloat(updatedFormData.shipping_fee || 0);
+    const newTotal = Math.round((subtotal + cgst + sgst + ship) * 100) / 100;
+    setFormData(prev => ({ 
+      ...prev, 
+      cgst_amount: cgst, 
+      sgst_amount: sgst, 
+      total_amount: newTotal 
+    }));
   };
 
   const subtotalVal = calculateSubtotal(formData.items);
   const cgstRate = parseFloat(formData.cgst_rate) || 0;
   const sgstRate = parseFloat(formData.sgst_rate) || 0;
   const shipping = parseFloat(formData.shipping_fee) || 0;
-  const cgst_amount = subtotalVal * (cgstRate / 100);
-  const sgst_amount = subtotalVal * (sgstRate / 100);
-  const grandTotal = subtotalVal + cgst_amount + sgst_amount + shipping;
+  const cgst_amount = formData.cgst_amount;
+  const sgst_amount = formData.sgst_amount;
+
+  // 移除會蓋掉資料的 useEffect
 
   return (
     <div className="po-modal-overlay" style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', zIndex: 100, overflowY: 'auto', padding: '2rem 0' }}>
@@ -216,28 +268,8 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
         .print-only { display: none !important; }
         @media print {
           .no-print { display: none !important; }
-          .print-only { 
-            display: block !important; 
-            visibility: visible !important;
-            white-space: normal !important;
-            word-break: break-all !important;
-          }
-          input, select, textarea, button.no-print {
-            display: none !important;
-          }
-          table {
-            font-size: 0.7rem !important;
-            table-layout: fixed !important;
-            width: 100% !important;
-            border: 1px solid #000 !important;
-          }
-          th, td {
-            padding: 2px !important;
-            border: 1px solid #000 !important;
-            overflow: visible !important;
-          }
+          .print-only { display: block !important; }
         }
-        .print-only { display: none; }
       `}</style>
       <div className="po-container card" style={{ width: '1200px', maxHeight: 'none', padding: '2rem', background: '#fff', color: '#000', borderRadius: '0', position: 'relative' }}>
         <div className="no-print" style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1rem', gap: '1rem' }}>
@@ -359,8 +391,17 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
                       value={item.material_number} 
                       disabled={isPreview}
                       onChange={(e) => {
+                        const val = e.target.value;
                         const newItems = [...formData.items];
-                        newItems[index].material_number = e.target.value;
+                        newItems[index].material_number = val;
+                        
+                        // 解析 "料號 - 品名" 格式
+                        const matNumber = val.split(' - ')[0];
+                        const matchedMat = materials.find(m => m.material_number === matNumber);
+                        if (matchedMat && matchedMat.unit) {
+                          newItems[index].unit = matchedMat.unit;
+                        }
+                        
                         setFormData({...formData, items: newItems});
                       }}
                       style={{ width: '100%', border: 'none', padding: '0.5rem', background: isPreview ? '#f3f4f6' : 'transparent' }} 
@@ -368,7 +409,21 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
                   </td>
                   <td style={{ border: '1px solid #000', padding: '0' }}>
                     <div className="print-only" style={{ display: 'none', padding: '4px', fontSize: '0.65rem' }}>{item.quantity}</div>
-                    <input className="no-print" type="number" step="0.01" value={item.quantity} disabled={isPreview} onChange={(e) => { const newItems = [...formData.items]; newItems[index].quantity = e.target.value; setFormData({...formData, items: newItems}); }} style={{ width: '100%', border: 'none', padding: '0.5rem', textAlign: 'center', background: isPreview ? '#f3f4f6' : 'transparent' }} />
+                    <input 
+                      className="no-print" 
+                      type="number" 
+                      step="0.01" 
+                      value={item.quantity} 
+                      disabled={isPreview} 
+                      onChange={(e) => { 
+                        const newItems = [...formData.items]; 
+                        newItems[index].quantity = e.target.value; 
+                        const nextData = {...formData, items: newItems};
+                        setFormData(nextData);
+                        updateTotalAmount(nextData); // 觸發計算
+                      }} 
+                      style={{ width: '100%', border: 'none', padding: '0.5rem', textAlign: 'center', background: isPreview ? '#f3f4f6' : 'transparent' }} 
+                    />
                   </td>
                   <td style={{ border: '1px solid #000', padding: '0' }}>
                     <div className="print-only" style={{ display: 'none', padding: '4px', fontSize: '0.65rem' }}>{item.unit}</div>
@@ -383,10 +438,24 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
                   </td>
                   <td style={{ border: '1px solid #000', padding: '0' }}>
                     <div className="print-only" style={{ display: 'none', padding: '4px', fontSize: '0.65rem' }}>{item.unit_price}</div>
-                    <input className="no-print" type="number" step="0.01" value={item.unit_price} disabled={isPreview} onChange={(e) => { const newItems = [...formData.items]; newItems[index].unit_price = e.target.value; setFormData({...formData, items: newItems}); }} style={{ width: '100%', border: 'none', padding: '0.5rem', textAlign: 'center', background: isPreview ? '#f3f4f6' : 'transparent' }} />
+                    <input 
+                      className="no-print" 
+                      type="number" 
+                      step="0.01" 
+                      value={item.unit_price} 
+                      disabled={isPreview} 
+                      onChange={(e) => { 
+                        const newItems = [...formData.items]; 
+                        newItems[index].unit_price = e.target.value; 
+                        const nextData = {...formData, items: newItems};
+                        setFormData(nextData);
+                        updateTotalAmount(nextData); // 觸發計算
+                      }} 
+                      style={{ width: '100%', border: 'none', padding: '0.5rem', textAlign: 'center', background: isPreview ? '#f3f4f6' : 'transparent' }} 
+                    />
                   </td>
                   <td style={{ border: '1px solid #000', padding: '0.5rem', textAlign: 'right', fontWeight: 'bold' }}>
-                    {formData.currency === 'USD' ? '$' : (formData.currency === 'TWD' || formData.currency === 'CNY' ? '¥' : '₹')} {(parseFloat(item.quantity) * parseFloat(item.unit_price) || 0).toLocaleString()}
+                    {formData.currency === 'USD' ? '$' : (formData.currency === 'TWD' || formData.currency === 'CNY' ? '¥' : '₹')} {round2(parseFloat(item.quantity) * parseFloat(item.unit_price)).toLocaleString()}
                   </td>
                   <td style={{ border: '1px solid #000', padding: '0' }}>
                     <div className="print-only" style={{ display: 'none', padding: '4px', fontSize: '0.7rem', wordBreak: 'break-all' }}>{item.date_of_purchase}</div>
@@ -429,36 +498,179 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
                 <td colSpan={isPreview ? 2 : 3} style={{ border: '1px solid #000' }}></td>
               </tr>
               <tr style={{ background: '#fff' }}>
-                <td colSpan="3" style={{ border: '1px solid #000', padding: '0.5rem', textAlign: 'right' }}>CGST:</td>
+                <td colSpan="4" style={{ border: '1px solid #000', padding: '0.5rem', textAlign: 'right', color: '#64748b' }}>不計稅項目 Excluding tax item:</td>
                 <td style={{ border: '1px solid #000', padding: '0' }}>
-                  <input type="number" value={formData.cgst_rate} disabled={isPreview} onChange={(e) => setFormData({...formData, cgst_rate: e.target.value})} style={{ width: '100%', border: 'none', padding: '0.5rem', textAlign: 'center' }} />
-                </td>
-                <td style={{ border: '1px solid #000', padding: '0.5rem', textAlign: 'right' }}>
-                  {formData.currency === 'USD' ? '$' : (formData.currency === 'TWD' || formData.currency === 'CNY' ? '¥' : '₹')} {cgst_amount.toLocaleString()}
+                  <input 
+                    type="number" 
+                    value={formData.excluding_tax_amount} 
+                    disabled={isPreview} 
+                    onChange={(e) => {
+                      const nextData = {...formData, excluding_tax_amount: e.target.value};
+                      setFormData(nextData);
+                      updateTotalAmount(nextData);
+                    }} 
+                    style={{ width: '100%', border: 'none', padding: '0.5rem', textAlign: 'right', background: isPreview ? '#f8fafc' : '#fffeb3' }} 
+                  />
                 </td>
                 <td colSpan={isPreview ? 2 : 3} style={{ border: '1px solid #000' }}></td>
               </tr>
               <tr style={{ background: '#fff' }}>
-                <td colSpan="3" style={{ border: '1px solid #000', padding: '0.5rem', textAlign: 'right' }}>SGST:</td>
+                <td colSpan="3" style={{ border: '1px solid #000', padding: '0.5rem', textAlign: 'right' }}>CGST (%):</td>
                 <td style={{ border: '1px solid #000', padding: '0' }}>
-                  <input type="number" value={formData.sgst_rate} disabled={isPreview} onChange={(e) => setFormData({...formData, sgst_rate: e.target.value})} style={{ width: '100%', border: 'none', padding: '0.5rem', textAlign: 'center' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 0.5rem' }}>
+                    <input 
+                      type="number" 
+                      value={formData.cgst_rate} 
+                      disabled={isPreview} 
+                      onChange={(e) => {
+                        const nextData = {...formData, cgst_rate: e.target.value};
+                        setFormData(nextData);
+                        updateTotalAmount(nextData);
+                      }} 
+                      style={{ width: '60%', border: 'none', padding: '0.5rem', textAlign: 'center' }} 
+                    />
+                    <span>%</span>
+                  </div>
                 </td>
-                <td style={{ border: '1px solid #000', padding: '0.5rem', textAlign: 'right' }}>
-                  {formData.currency === 'USD' ? '$' : (formData.currency === 'TWD' || formData.currency === 'CNY' ? '¥' : '₹')} {sgst_amount.toLocaleString()}
+                <td style={{ border: '1px solid #000', padding: '0', textAlign: 'right' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#fff' }}>
+                    <span style={{ paddingLeft: '0.5rem' }}>{formData.currency === 'USD' ? '$' : (formData.currency === 'TWD' || formData.currency === 'CNY' ? '¥' : '₹')}</span>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      value={formData.cgst_amount} 
+                      disabled={isPreview}
+                      onChange={(e) => {
+                        const newAmt = parseFloat(e.target.value) || 0;
+                        setFormData(prev => ({
+                          ...prev,
+                          cgst_amount: newAmt,
+                          total_amount: subtotalVal + newAmt + prev.sgst_amount + parseFloat(prev.shipping_fee)
+                        }));
+                      }}
+                      style={{ width: '100%', border: 'none', padding: '0.5rem', textAlign: 'right', fontWeight: 'bold', background: isPreview ? '#f1f5f9' : '#fffeb3' }} 
+                    />
+                  </div>
                 </td>
                 <td colSpan={isPreview ? 2 : 3} style={{ border: '1px solid #000' }}></td>
               </tr>
               <tr style={{ background: '#fff' }}>
-                <td colSpan="4" style={{ border: '1px solid #000', padding: '0.5rem', textAlign: 'right' }}>運費 Shipping:</td>
+                <td colSpan="3" style={{ border: '1px solid #000', padding: '0.5rem', textAlign: 'right' }}>SGST (%):</td>
                 <td style={{ border: '1px solid #000', padding: '0' }}>
-                  <input type="number" value={formData.shipping_fee} disabled={isPreview} onChange={(e) => setFormData({...formData, shipping_fee: e.target.value})} style={{ width: '100%', border: 'none', padding: '0.5rem', textAlign: 'right', fontWeight: 'bold' }} />
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 0.5rem' }}>
+                    <input 
+                      type="number" 
+                      value={formData.sgst_rate} 
+                      disabled={isPreview} 
+                      onChange={(e) => {
+                        const nextData = {...formData, sgst_rate: e.target.value};
+                        setFormData(nextData);
+                        updateTotalAmount(nextData);
+                      }} 
+                      style={{ width: '60%', border: 'none', padding: '0.5rem', textAlign: 'center' }} 
+                    />
+                    <span>%</span>
+                  </div>
+                </td>
+                <td style={{ border: '1px solid #000', padding: '0', textAlign: 'right' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', background: '#fff' }}>
+                    <span style={{ paddingLeft: '0.5rem' }}>{formData.currency === 'USD' ? '$' : (formData.currency === 'TWD' || formData.currency === 'CNY' ? '¥' : '₹')}</span>
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      value={formData.sgst_amount} 
+                      disabled={isPreview}
+                      onChange={(e) => {
+                        const newAmt = parseFloat(e.target.value) || 0;
+                        setFormData(prev => ({
+                          ...prev,
+                          sgst_amount: newAmt,
+                          total_amount: subtotalVal + prev.cgst_amount + newAmt + parseFloat(prev.shipping_fee)
+                        }));
+                      }}
+                      style={{ width: '100%', border: 'none', padding: '0.5rem', textAlign: 'right', fontWeight: 'bold', background: isPreview ? '#f1f5f9' : '#fffeb3' }} 
+                    />
+                  </div>
                 </td>
                 <td colSpan={isPreview ? 2 : 3} style={{ border: '1px solid #000' }}></td>
+              </tr>
+              <tr style={{ background: '#fff' }}>
+                <td colSpan="4" style={{ border: '1px solid #000', padding: '0.5rem', textAlign: 'right' }}>其他費用 Other Fees:</td>
+                <td style={{ border: '1px solid #000', padding: '0' }}>
+                  <input 
+                    type="number" 
+                    value={formData.shipping_fee} 
+                    disabled={isPreview} 
+                    onChange={(e) => {
+                      const nextData = {...formData, shipping_fee: e.target.value};
+                      setFormData(nextData);
+                      updateTotalAmount(nextData);
+                    }} 
+                    style={{ width: '100%', border: 'none', padding: '0.5rem', textAlign: 'right', fontWeight: 'bold' }} 
+                  />
+                </td>
+                <td colSpan={isPreview ? 2 : 3} style={{ border: '1px solid #000', padding: '0' }}>
+                  <div className="print-only" style={{ display: 'none', padding: '4px', fontSize: '0.7rem' }}>
+                    {formData.shipping_remark_zh} {formData.shipping_remark_en && `(${formData.shipping_remark_en})`}
+                  </div>
+                  <div className="no-print" style={{ display: 'flex', gap: '4px', padding: '4px' }}>
+                    <input 
+                      placeholder="中文備註"
+                      style={{ flex: 1, border: '1px solid #e2e8f0', padding: '0.25rem', fontSize: '0.75rem', borderRadius: '4px' }}
+                      value={formData.shipping_remark_zh}
+                      disabled={isPreview}
+                      onChange={(e) => setFormData({...formData, shipping_remark_zh: e.target.value})}
+                      onBlur={async (e) => {
+                        if (e.target.value && !formData.shipping_remark_en) {
+                          const en = await handleTranslate(e.target.value, 'zh|en');
+                          setFormData(prev => ({ ...prev, shipping_remark_en: en }));
+                        }
+                      }}
+                    />
+                    <input 
+                      placeholder="EN Remark (Auto-Translate)"
+                      style={{ flex: 1, border: '1px solid #e2e8f0', padding: '0.25rem', fontSize: '0.75rem', borderRadius: '4px' }}
+                      value={formData.shipping_remark_en}
+                      disabled={isPreview}
+                      onChange={(e) => setFormData({...formData, shipping_remark_en: e.target.value})}
+                      onBlur={async (e) => {
+                        if (e.target.value && !formData.shipping_remark_zh) {
+                          const zh = await handleTranslate(e.target.value, 'en|zh');
+                          setFormData(prev => ({ ...prev, shipping_remark_zh: zh }));
+                        }
+                      }}
+                    />
+                  </div>
+                </td>
               </tr>
               <tr style={{ background: '#e2e8f0', fontWeight: '900' }}>
                 <td colSpan="4" style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'right', fontSize: '1.1rem' }}>總計 Grand Total:</td>
-                <td style={{ border: '1px solid #000', padding: '0.75rem', textAlign: 'right', fontSize: '1.25rem', color: '#1e3a8a' }}>
-                  {formData.currency === 'USD' ? '$' : (formData.currency === 'TWD' || formData.currency === 'CNY' ? '¥' : '₹')} {grandTotal.toLocaleString()}
+                <td style={{ border: '1px solid #000', padding: '0', textAlign: 'right', fontSize: '1.25rem', color: '#1e3a8a', background: '#fff' }}>
+                  {isPreview ? (
+                    <div style={{ padding: '0.75rem', background: '#f1f5f9' }}>
+                      {formData.currency === 'USD' ? '$' : (formData.currency === 'TWD' || formData.currency === 'CNY' ? '¥' : '₹')} {parseFloat(formData.total_amount || 0).toLocaleString()}
+                    </div>
+                  ) : (
+                    <div style={{ display: 'flex', alignItems: 'center', background: '#fff' }}>
+                      <span style={{ paddingLeft: '0.5rem', fontSize: '1.1rem' }}>{formData.currency === 'USD' ? '$' : (formData.currency === 'TWD' || formData.currency === 'CNY' ? '¥' : '₹')}</span>
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        value={formData.total_amount} 
+                        onChange={(e) => setFormData({...formData, total_amount: e.target.value})}
+                        style={{ 
+                          width: '100%', 
+                          border: 'none', 
+                          padding: '0.75rem', 
+                          textAlign: 'right', 
+                          fontSize: '1.25rem', 
+                          fontWeight: '900', 
+                          color: '#1e3a8a',
+                          background: '#fffeb3' // 黃色背景提示可修改
+                        }} 
+                      />
+                    </div>
+                  )}
                 </td>
                 <td colSpan={isPreview ? 2 : 3} style={{ border: '1px solid #000' }}></td>
               </tr>
@@ -544,12 +756,16 @@ export default function POModal({ user, editData, isPreview, onClose, suppliers 
           {suppliers.map(s => <option key={s.id} value={`${s.supplier_code} - ${s.name}`} />)}
         </datalist>
         <datalist id="unit-datalist">
-          {['M', 'PC', 'KG', 'PCS', 'SET', 'BOX', 'ROLL', 'BAG', 'BTL', 'L', 'M2', 'M3'].map(u => (
-            <option key={u} value={u} />
+          {units.map(u => (
+            <option key={u.id} value={u.name} />
           ))}
-          {Array.from(new Set(materials.map(m => m.unit).filter(Boolean))).map(u => (
-            <option key={u} value={u} />
-          ))}
+          {/* 備援：顯示物料中已存在的單位 */}
+          {Array.from(new Set(materials.map(m => m.unit).filter(Boolean)))
+            .filter(mu => !units.some(u => u.name === mu))
+            .map(u => (
+              <option key={`mat-${u}`} value={u} />
+            ))
+          }
         </datalist>
       </div>
     </div>
